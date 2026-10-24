@@ -1,0 +1,15 @@
+{
+  "name": "three-body-orbits",
+  "version": "1.0.0",
+  "description": "Interactive gallery and braid view of periodic three-body orbits (classic, Li & Liao, Hristov et al. free-fall catalogues)",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "python3 -m http.server -d app 8000",
+    "test": "node scripts/test-physics.js",
+    "build-data": "node scripts/build-data.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

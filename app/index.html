@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Three-Body Orbits</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="stage"></canvas>
+<canvas id="overlay" aria-hidden="true"></canvas>
+
+<button id="panelToggle" class="fab" title="Settings (S)" aria-label="Toggle settings">
+  <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+</button>
+
+<aside id="panel" class="panel open">
+  <header>
+    <h1>Three-Body Orbits</h1>
+    <p class="sub">Periodic solutions of the planar Newtonian three-body problem</p>
+  </header>
+
+  <section>
+    <h2>View</h2>
+    <div class="seg" id="viewSeg">
+      <button data-v="orbits" class="on">Orbits</button>
+      <button data-v="braid">Braids</button>
+    </div>
+    <div id="braidOpts" hidden>
+      <p class="hint">World-lines: position along a projection axis (→) against time (↑). At each crossing the strand nearer the viewer passes over. All cells scroll at the same scale-invariant rate.</p>
+      <label title="Scale-invariant time t* = t|E|^(3/2); a figure-eight period is 9.2">Time window <output id="braidSpanOut"></output>
+        <input type="range" id="braidSpan" min="1" max="60" step="0.5" value="8"></label>
+      <label>Projection angle <output id="braidAngleOut"></output>
+        <input type="range" id="braidAngle" min="0" max="180" step="1" value="0"></label>
+      <label class="check"><input type="checkbox" id="braidSpin"> Rotate projection slowly</label>
+      <label>Crossing gap <output id="braidGapOut"></output>
+        <input type="range" id="braidGap" min="0" max="3" step="0.1" value="1"></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Collection</h2>
+    <div class="seg" id="collectionSeg">
+      <button data-v="classic" class="on">Classic</button>
+      <button data-v="liao">Li &amp; Liao</button>
+      <button data-v="freefall">Free-fall</button>
+    </div>
+    <div id="freefallOpts" hidden>
+      <label>Order
+        <select id="ffSort">
+          <option value="tstar">Scale-invariant period T* (simplest first)</option>
+          <option value="lyap">Lyapunov exponent (least unstable first)</option>
+          <option value="lyapDesc">Lyapunov exponent (most unstable first)</option>
+          <option value="random">Random</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" id="ffSelfDual"> Self-dual (symmetric) only — 236 solutions</label>
+      <label class="check"><input type="checkbox" id="ffDistinct" checked> One i.c. per distinct solution</label>
+      <div class="row2">
+        <label>T* min <input type="number" id="ffTmin" value="0" step="1" min="0"></label>
+        <label>T* max <input type="number" id="ffTmax" value="80" step="1" min="0"></label>
+      </div>
+      <p class="hint">Data: Hristov, Hristova, Dmitrašinović &amp; Tanikawa, arXiv:2308.16159. 24,582 i.c.s / 12,409 solutions.</p>
+    </div>
+    <div id="classicOpts">
+      <p class="hint">20 famous orbits: figure-eight, Lagrange, Šuvakov–Dmitrašinović butterflies &amp; moths, Broucke. Larger grids repeat them — use Li &amp; Liao for 2,044 distinct orbits.</p>
+    </div>
+    <div id="liaoOpts" hidden>
+      <label>Mass of body 3 (m₁ = m₂ = 1)
+        <select id="llMass">
+          <option value="all">All masses — 2,044 orbits</option>
+          <option value="1">m₃ = 1 (equal masses) — 695</option>
+          <option value="0.5">m₃ = 0.5 — 565</option>
+          <option value="0.75">m₃ = 0.75 — 401</option>
+          <option value="2">m₃ = 2 — 237</option>
+          <option value="4">m₃ = 4 — 85</option>
+          <option value="5">m₃ = 5 — 35</option>
+          <option value="8">m₃ = 8 — 17</option>
+          <option value="10">m₃ = 10 — 9</option>
+        </select>
+      </label>
+      <label>Symmetry class
+        <select id="llClass">
+          <option value="all">All classes</option>
+          <option value="I.A">I.A — reflection symmetric (both axes)</option>
+          <option value="I.B">I.B</option>
+          <option value="I.C">I.C</option>
+          <option value="II.A">II.A</option>
+          <option value="II.B">II.B</option>
+          <option value="II.C">II.C</option>
+          <option value="II.D">II.D</option>
+        </select>
+      </label>
+      <label>Order
+        <select id="llSort">
+          <option value="tstar">Scale-invariant period T* (simplest first)</option>
+          <option value="lf">Free-group word length</option>
+          <option value="catalog">Catalogue order</option>
+          <option value="random">Random</option>
+        </select>
+      </label>
+      <p class="hint">Data: Li &amp; Liao, Sci. China PMA 60 (2017); Li, Jing &amp; Liao, PASJ 70 (2018). Zero angular momentum, isosceles-collinear start.</p>
+    </div>
+      <div class="pager">
+        <button id="pgPrev" aria-label="Previous page">‹</button>
+        <span id="pgInfo">–</span>
+        <button id="pgNext" aria-label="Next page">›</button>
+        <button id="pgShuffle" title="Random page">Shuffle</button>
+      </div>
+
+  </section>
+
+  <section>
+    <h2>Grid</h2>
+    <div class="row2">
+      <label>Rows <input type="number" id="rows" min="1" max="10" value="4"></label>
+      <label>Columns <input type="number" id="cols" min="1" max="12" value="5"></label>
+    </div>
+    <label class="check"><input type="checkbox" id="labels"> Show labels</label>
+    <label class="check"><input type="checkbox" id="orient" checked> Auto-orient (principal axes)</label>
+  </section>
+
+  <section>
+    <h2>Motion</h2>
+    <div class="seg" id="timingSeg">
+      <button data-v="loop" class="on" title="Every orbit completes one period in the same time">Equal loops</button>
+      <button data-v="scaled" title="Loop duration proportional to scale-invariant period T*">Proportional to T*</button>
+    </div>
+    <label>Loop duration <output id="loopOut"></output>
+      <input type="range" id="loop" min="2" max="60" step="0.5" value="9"></label>
+    <label>Speed <output id="speedOut"></output>
+      <input type="range" id="speed" min="0" max="3" step="0.05" value="1"></label>
+    <label class="check"><input type="checkbox" id="randPhase"> Random phase per cell</label>
+    <div class="btns">
+      <button id="playBtn">Pause</button>
+      <button id="restartBtn">Restart</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Look</h2>
+    <label>Palette
+      <select id="palette">
+        <option value="ember">Ember (original)</option>
+        <option value="aurora">Aurora</option>
+        <option value="neon">Neon</option>
+        <option value="mono">Moonlight</option>
+        <option value="rgb">Primary</option>
+        <option value="custom">Custom…</option>
+      </select>
+    </label>
+    <div id="customColors" class="colors" hidden>
+      <input type="color" id="c1" value="#ff7a22">
+      <input type="color" id="c2" value="#fff0d6">
+      <input type="color" id="c3" value="#9aa6ff">
+      <input type="color" id="cbg" value="#040306" title="Background">
+    </div>
+    <label class="check"><input type="checkbox" id="shuffleColors" checked> Vary color order per cell</label>
+    <label>Trail length <output id="trailOut"></output>
+      <input type="range" id="trail" min="0.02" max="1" step="0.01" value="0.4"></label>
+    <label>Trail width <output id="widthOut"></output>
+      <input type="range" id="width" min="0.3" max="4" step="0.1" value="1.2"></label>
+    <label>Glow <output id="glowOut"></output>
+      <input type="range" id="glow" min="0" max="2" step="0.05" value="1"></label>
+    <label>Body size <output id="bodyOut"></output>
+      <input type="range" id="body" min="0" max="3" step="0.05" value="1"></label>
+    <label class="check"><input type="checkbox" id="ghost"> Faint full orbit path</label>
+  </section>
+
+  <section>
+    <h2>Export</h2>
+    <div class="btns">
+      <button id="pngBtn">Save PNG</button>
+      <button id="recBtn">Record loop</button>
+    </div>
+  </section>
+
+  <footer class="hint">Click a cell to inspect it. Keys: <kbd>Space</kbd> pause, <kbd>S</kbd> settings, <kbd>B</kbd> braids, <kbd>←</kbd>/<kbd>→</kbd> page, <kbd>Esc</kbd> back.</footer>
+</aside>
+
+<aside id="inspector" class="inspector" hidden>
+  <header>
+    <button id="backBtn" class="link">← Back to grid</button>
+    <h2 id="insTitle">Orbit</h2>
+    <p id="insSub" class="sub"></p>
+  </header>
+  <dl id="insData"></dl>
+
+  <section id="domainSec">
+    <h3>Agekyan–Anosova domain D</h3>
+    <p class="hint">Body 1 starts at P(x, y); bodies 2, 3 at (∓0.5, 0); all at rest. Dots: the 24,582 periodic i.c.s. Click to load the nearest periodic orbit, or <label class="inline"><input type="checkbox" id="freePick"> simulate any point</label>.</p>
+    <canvas id="domain" width="300" height="300"></canvas>
+    <div class="legend"><span><i class="dot a"></i>periodic i.c.</span><span><i class="dot b"></i>self-dual</span><span><i class="dot c"></i>current</span></div>
+  </section>
+
+  <section id="stabSec">
+    <h3>Stability test</h3>
+    <p class="hint">Nudge body 1 and integrate several periods without forcing periodicity. Unstable orbits drift apart; the paper reports Lyapunov exponents for every orbit.</p>
+    <div class="row2">
+      <label>Perturbation 10^<input type="number" id="pertExp" value="-6" min="-14" max="-1" step="1"></label>
+      <label>Periods <input type="number" id="pertPeriods" value="4" min="1" max="20"></label>
+    </div>
+    <div class="btns">
+      <button id="pertRun">Run perturbed</button>
+      <button id="pertReset">Exact orbit</button>
+    </div>
+  </section>
+
+  <section id="customSec">
+    <h3>Custom initial conditions</h3>
+    <p class="hint">Masses, positions (x, y), velocities (vx, vy). G = 1. Starts from the current orbit.</p>
+    <table class="ic">
+      <thead><tr><th></th><th>m</th><th>x</th><th>y</th><th>vx</th><th>vy</th></tr></thead>
+      <tbody id="icBody"></tbody>
+    </table>
+    <div class="row2">
+      <label>Duration <input type="number" id="icDur" value="10" min="0.1" step="0.5"></label>
+      <label class="check"><input type="checkbox" id="icPeriodic"> Treat as periodic</label>
+    </div>
+    <div class="btns"><button id="icRun">Simulate</button></div>
+    <p id="icMsg" class="hint"></p>
+  </section>
+</aside>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="physics.js"></script>
+<script src="gl-trails.js"></script>
+<script src="classics.js"></script>
+<script src="orbits-data.js"></script>
+<script src="liao-data.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

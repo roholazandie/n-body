@@ -1,0 +1,16 @@
+# OS / editor
+.DS_Store
+*.swp
+.vscode/
+.idea/
+node_modules/
+
+# Third-party reference material kept locally only (not ours to redistribute)
+*.pdf
+nnn.gif
+D7368B8F-*.jpeg
+
+# Recordings / exports
+*.webm
+*.mp4
+three-body.png
