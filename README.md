@@ -20,6 +20,8 @@ No build step and no dependencies — open `app/index.html` in a browser (works 
 python3 -m http.server -d app 8000   # then open http://localhost:8000
 ```
 
+**Deploy:** it's a static site. On Vercel, import the repo as-is — `vercel.json` serves the `app/` folder with no build step. On GitHub Pages, publish from `main` and open `/app/`.
+
 ## Features
 
 - **Grid of live orbits** — any rows × columns, paging/shuffling through each catalogue, filters (mass ratio, symmetry class, self-dual, T* range) and sorting (T*, word length, Lyapunov exponent, random).
