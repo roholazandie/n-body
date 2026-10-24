@@ -29,7 +29,7 @@
     <div id="braidOpts" hidden>
       <p class="hint">World-lines: position along a projection axis (→) against time (↑). At each crossing the strand nearer the viewer passes over. All cells scroll at the same scale-invariant rate.</p>
       <label title="Scale-invariant time t* = t|E|^(3/2); a figure-eight period is 9.2">Time window <output id="braidSpanOut"></output>
-        <input type="range" id="braidSpan" min="1" max="60" step="0.5" value="8"></label>
+        <input type="range" id="braidSpan" min="0" max="1000" step="1" value="347"></label>
       <label>Projection angle <output id="braidAngleOut"></output>
         <input type="range" id="braidAngle" min="0" max="180" step="1" value="0"></label>
       <label class="check"><input type="checkbox" id="braidSpin"> Rotate projection slowly</label>
@@ -175,7 +175,7 @@
     </div>
   </section>
 
-  <footer class="hint">Click a cell to inspect it. Keys: <kbd>Space</kbd> pause, <kbd>S</kbd> settings, <kbd>B</kbd> braids, <kbd>←</kbd>/<kbd>→</kbd> page, <kbd>Esc</kbd> back.</footer>
+  <footer class="hint">Click a cell to inspect it. Keys: <kbd>Space</kbd> pause, <kbd>S</kbd> settings, <kbd>B</kbd> braids, <kbd>+</kbd>/<kbd>−</kbd> braid zoom, <kbd>←</kbd>/<kbd>→</kbd> page, <kbd>Esc</kbd> back.</footer>
 </aside>
 
 <aside id="inspector" class="inspector" hidden>
@@ -221,6 +221,12 @@
     <p id="icMsg" class="hint"></p>
   </section>
 </aside>
+
+<div id="braidZoom" class="zoomctl" hidden>
+  <button id="zoomIn" title="Zoom in: shorter time window (+)" aria-label="Zoom in on time">+</button>
+  <span id="zoomValue" title="Time window in scale-invariant time t*"></span>
+  <button id="zoomOut" title="Zoom out: longer time window (−)" aria-label="Zoom out in time">−</button>
+</div>
 
 <div id="toast" class="toast" hidden></div>
 

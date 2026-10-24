@@ -80,6 +80,13 @@ table.ic input { width: 100%; min-width: 0; background: rgba(255,255,255,.05); c
 table.ic td:first-child { width: 14px; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
 
+.zoomctl { position: fixed; z-index: 15; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.zoomctl button { width: 32px; height: 32px; padding: 0; border-radius: 7px; font-size: 18px; line-height: 1; }
+.zoomctl button:disabled { opacity: .35; cursor: default; }
+.zoomctl span { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
 .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 40; background: var(--panel);
   border: 1px solid var(--line); padding: 8px 14px; border-radius: 9px; backdrop-filter: blur(10px); }
 

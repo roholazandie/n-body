@@ -31,6 +31,7 @@
   let S = Object.assign({}, DEFAULTS);
   try { Object.assign(S, JSON.parse(localStorage.getItem('threebody.settings') || '{}')); } catch (e) { /* storage unavailable */ }
   // repair values persisted by older versions (e.g. fractional grid sizes)
+  S.braidSpan = Number.isFinite(+S.braidSpan) ? Math.max(1, Math.min(400, +S.braidSpan)) : DEFAULTS.braidSpan;
   for (const k of ['rows', 'cols']) {
     const v = Math.round(+S[k]);
     S[k] = Number.isFinite(v) ? Math.max(1, Math.min(k === 'rows' ? 10 : 12, v)) : DEFAULTS[k];
@@ -330,7 +331,7 @@
   }
 
   // Sample body b's path over [head - L, head] into pts (CSS px). Returns segment count.
-  const pts = new Float32Array(2 * 8200);
+  const pts = new Float32Array(2 * 8200); // up to 8200 points per sampled path
   function sampleTrail(o, b, head, L, sx, sy, scale, maxPts) {
     const n = o.n, v = o.view, periodic = o.periodic;
     let start = head - L;
@@ -411,7 +412,8 @@
   // angle θ, vertical = time (now at the top, history scrolling down). The other
   // in-plane coordinate is depth: at a crossing the nearer strand passes over and
   // cuts a gap in the one behind, as in a braid diagram.
-  const strand = Array.from({ length: 3 }, () => ({ x: new Float32Array(4100), y: new Float32Array(4100), d: new Float32Array(4100), nx: new Float32Array(4100), ny: new Float32Array(4100), n: 0 }));
+  const SMAX = 8200;
+  const strand = Array.from({ length: 3 }, () => ({ x: new Float32Array(SMAX), y: new Float32Array(SMAX), d: new Float32Array(SMAX), nx: new Float32Array(SMAX), ny: new Float32Array(SMAX), n: 0 }));
   const segOrder = [];
   function braidAngle() { return (S.braidAngle + (S.braidSpin ? clock * 12 : 0)) * Math.PI / 180; }
 
@@ -425,10 +427,15 @@
     const top = rect.y + rect.h * (isFocus ? 0.1 : 0.12), height = rect.h * (isFocus ? 0.74 : S.labels ? 0.68 : 0.76);
     const th = braidAngle(), ct = Math.cos(th), st = Math.sin(th);
     const half = Math.hypot(o.ext[0], o.ext[1]) / 2 || 0.5;
-    const sx = (rect.w * (isFocus ? 0.4 : 0.42)) / half, cx = rect.x + rect.w / 2;
-    const lw = S.width * Math.min(2.2, Math.max(0.8, Math.min(rect.w, rect.h) / 240)) * (isFocus ? 1.3 : 1);
-    const gap = Math.max(2, lw * 1.3) * S.braidGap;
-    const maxPts = Math.min(4000, Math.max(120, Math.round(height * (isFocus ? 2 : 1.2))));
+    // Zoom like a camera, but gentler sideways: time is compressed by SPAN_REF/span, the
+    // braid's width and strand thickness by its square root, so zooming out narrows the
+    // rope instead of stretching it horizontally (never wider than the cell when zooming in).
+    const hz = Math.min(1, Math.sqrt(SPAN_REF / S.braidSpan));
+    const sx = (rect.w * (isFocus ? 0.4 : 0.42) * hz) / half, cx = rect.x + rect.w / 2;
+    const lw = Math.max(0.6, S.width * Math.min(2.2, Math.max(0.8, Math.min(rect.w, rect.h) / 240)) * (isFocus ? 1.3 : 1) * hz);
+    const gap = Math.max(0.8, Math.max(2, lw * 1.3) * hz) * S.braidGap;
+    // enough points for both the screen height and the number of periods in the window
+    const maxPts = Math.min(isFocus ? 8000 : 1500, Math.max(120, Math.round(Math.max(height * (isFocus ? 2 : 1.2), periods * (isFocus ? 400 : 150)))));
     const perm = S.shuffleColors ? cell.perm : PERMS[0];
     let start = head - L;
     if (!o.periodic && start < 0) start = 0;
@@ -453,14 +460,14 @@
         if (len > 1e-9) { lx = -ty / len; ly = tx / len; }
         sd.nx[k] = lx; sd.ny[k] = ly;
       }
-      for (let k = 0; k < count; k++) segOrder.push(b * 8192 + k);
+      for (let k = 0; k < count; k++) segOrder.push(b * 16384 + k);
     }
     // painter's order: farthest pieces first
-    const dep = (code) => { const sd = strand[code >> 13], k = code & 8191; return sd.d[k] + sd.d[k + 1]; };
+    const dep = (code) => { const sd = strand[code >> 14], k = code & 16383; return sd.d[k] + sd.d[k + 1]; };
     segOrder.sort((a, b) => dep(a) - dep(b));
     if (GL) GL.setMode(1);
     for (const code of segOrder) {
-      const b = code >> 13, k = code & 8191, sd = strand[b];
+      const b = code >> 14, k = code & 16383, sd = strand[b];
       const f = k / sd.n, fade = 0.35 + 0.65 * Math.min(1, f * 4); // soften the oldest end
       const rgb = colorSet.rgb[perm[b]];
       if (GL) {
@@ -479,7 +486,7 @@
     if (GL) GL.setMode(0); else ctx.globalCompositeOperation = 'lighter';
     // bodies ride the "now" line at the top
     if (S.body > 0) {
-      const size = Math.max(10, Math.min(rect.w, rect.h) * 0.07) * S.body * (0.5 + 0.5 * Math.min(1.5, S.glow + 0.3));
+      const size = Math.max(8, Math.min(rect.w, rect.h) * 0.07 * Math.max(0.45, Math.sqrt(hz))) * S.body * (0.5 + 0.5 * Math.min(1.5, S.glow + 0.3));
       for (let b = 0; b < 3; b++) {
         const sd = strand[b];
         if (!sd.n) continue;
@@ -500,7 +507,7 @@
       octx.font = '11px ui-sans-serif, system-ui, sans-serif';
       octx.textAlign = 'left';
       octx.fillText('now', rect.x + rect.w * 0.08, top - 6);
-      octx.fillText(`↑ time  ·  window t* = ${S.braidSpan} (≈ ${periods.toFixed(2)} periods)  ·  projection ${((braidAngle() * 180 / Math.PI) % 180).toFixed(0)}°`, rect.x + rect.w * 0.08, top + height + 18);
+      octx.fillText(`↑ time  ·  window t* = ${fmtSpan(S.braidSpan)} (≈ ${periods < 10 ? periods.toFixed(2) : periods.toFixed(1)} periods)  ·  projection ${((braidAngle() * 180 / Math.PI) % 180).toFixed(0)}°`, rect.x + rect.w * 0.08, top + height + 18);
     }
   }
 
@@ -593,6 +600,7 @@
       ctx.globalCompositeOperation = 'lighter';
       ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
     }
+    placeZoomControl(focus && S.view === 'braid' ? rects[0] : null);
     if (focus) drawCell(focus, rects[0], true);
     else cells.forEach((c, k) => drawCell(c, rects[k], false));
     if (GL) GL.flush();
@@ -613,6 +621,34 @@
     return c;
   }
   let recordCanvas = null;
+
+  // ---------- braid time-window zoom ----------
+  // The window (in scale-invariant time t*) is shared by the slider, the +/- buttons,
+  // the mouse wheel and the +/- keys. The slider is logarithmic over [SPAN_MIN, SPAN_MAX].
+  const SPAN_MIN = 1, SPAN_MAX = 400, SPAN_REF = 8, ZOOM_STEP = 1.5; // SPAN_REF: full-width window (the default)
+  const sliderFromSpan = (v) => Math.round(1000 * Math.log(v / SPAN_MIN) / Math.log(SPAN_MAX / SPAN_MIN));
+  const spanFromSlider = (x) => SPAN_MIN * Math.pow(SPAN_MAX / SPAN_MIN, x / 1000);
+  const fmtSpan = (v) => (v < 10 ? v.toFixed(1) : v.toFixed(0));
+  function syncBraidSpan() {
+    $('braidSpan').value = sliderFromSpan(S.braidSpan);
+    $('braidSpanOut').textContent = 't* = ' + fmtSpan(S.braidSpan);
+    $('zoomIn').disabled = S.braidSpan <= SPAN_MIN * 1.0001;
+    $('zoomOut').disabled = S.braidSpan >= SPAN_MAX * 0.9999;
+    $('zoomValue').textContent = fmtSpan(S.braidSpan);
+  }
+  function setBraidSpan(v) {
+    S.braidSpan = Math.max(SPAN_MIN, Math.min(SPAN_MAX, v));
+    syncBraidSpan(); save();
+  }
+  let zoomRectKey = '';
+  function placeZoomControl(rect) {
+    const el = $('braidZoom');
+    const key = rect ? `${Math.round(rect.x + rect.w)},${Math.round(rect.y)}` : '';
+    if (key === zoomRectKey) return;
+    zoomRectKey = key;
+    el.hidden = !rect;
+    if (rect) { el.style.left = `${rect.x + rect.w - 56}px`; el.style.top = `${rect.y + 16}px`; }
+  }
 
   // ---------- UI wiring ----------
   function seg(id, key, cb) {
@@ -681,7 +717,15 @@
     const syncView = () => { $('braidOpts').hidden = S.view !== 'braid'; };
     seg('viewSeg', 'view', syncView);
     syncView();
-    range('braidSpan', 'braidSpan', (v) => 't* = ' + v);
+    $('braidSpan').addEventListener('input', () => setBraidSpan(spanFromSlider(+$('braidSpan').value)));
+    syncBraidSpan();
+    $('zoomIn').onclick = () => setBraidSpan(S.braidSpan / ZOOM_STEP);
+    $('zoomOut').onclick = () => setBraidSpan(S.braidSpan * ZOOM_STEP);
+    canvas.addEventListener('wheel', (e) => {
+      if (!focus || S.view !== 'braid') return;
+      e.preventDefault();
+      setBraidSpan(S.braidSpan * Math.exp(Math.max(-1, Math.min(1, e.deltaY * 0.002))));
+    }, { passive: false });
     range('braidAngle', 'braidAngle', (v) => v + '°');
     check('braidSpin', 'braidSpin');
     range('braidGap', 'braidGap', (v) => v.toFixed(1) + '×');
@@ -746,6 +790,8 @@
       else if (e.key === 'Escape') closeFocus();
       else if (e.key === 'ArrowRight' && !focus) gotoPage(S.page + 1);
       else if (e.key === 'ArrowLeft' && !focus) gotoPage(S.page - 1);
+      else if ((e.key === '+' || e.key === '=') && focus && S.view === 'braid') setBraidSpan(S.braidSpan / ZOOM_STEP);
+      else if ((e.key === '-' || e.key === '_') && focus && S.view === 'braid') setBraidSpan(S.braidSpan * ZOOM_STEP);
     });
     $('backBtn').onclick = closeFocus;
     initInspector();
