@@ -74,5 +74,50 @@ check('energy is conserved through a near-collision (free-fall i.c. 5001)', () =
   return `|ΔE| = ${dE.toExponential(1)}`;
 });
 
+// ---------- braid topology ----------
+const Braid = require(path.join(APP, 'braid.js'));
+const closedT = (c) => Physics.closedOrbit(c.s, [1, 1, 1], c.T, 2000).T;
+
+check('figure-eight braid is (σ1 σ2⁻¹)³, the golden braid cubed', () => {
+  const c = CLASSICS[0];
+  const r = Braid.analyze(c.s, [1, 1, 1], closedT(c), 'closed');
+  assert.strictEqual(Braid.braidString(r.reduced), 'a B a B a B');
+  assert.strictEqual(r.inv.trace, 18n);
+  assert.strictEqual(r.syz.map((z) => z.mid + 1).join(''), '123123');
+  assert(r.consistent);
+  return `trace 18, log λ = ${r.inv.logLambda.toFixed(4)}`;
+});
+
+check('Lagrange is a pure rotation (periodic); Broucke A1 is reducible', () => {
+  const lag = Braid.analyze(CLASSICS[1].s, [1, 1, 1], closedT(CLASSICS[1]), 'closed');
+  assert.strictEqual(lag.inv.type, 'periodic');
+  assert.strictEqual(Math.abs(lag.inv.expSum), 6); // one full twist Δ²
+  const br = CLASSICS.find((c) => c.name === 'Broucke A1');
+  assert.strictEqual(Braid.analyze(br.s, [1, 1, 1], closedT(br), 'closed').inv.type, 'reducible');
+});
+
+check('braid trace equals the free-group-word trace via Γ(2) (every 25th Li & Liao orbit)', () => {
+  // independent route: F2 word on the shape sphere, a ↦ σ1², b ↦ σ2⁻² in PSL(2,Z)
+  const f2trace = (w) => {
+    let a = 1n, b = 0n, c = 0n, d = 1n;
+    for (const ch of w) {
+      const e = ch === ch.toLowerCase() ? 1n : -1n;
+      if (ch.toLowerCase() === 'a') { const k = 2n * e; b += a * k; d += c * k; } else { const k = -2n * e; a -= b * k; c -= d * k; }
+    }
+    const t = a + d; return t < 0n ? -t : t;
+  };
+  const rows = loadData('liao-data.js', 'LIAO_DATA');
+  let n = 0;
+  for (let i = 0; i < rows.length; i += 25) {
+    const [, m3, v1, v2, T] = rows[i].map(Number);
+    const s = [-1, 0, 1, 0, 0, 0, v1, v2, v1, v2, -2 * v1 / m3, -2 * v2 / m3];
+    const r = Braid.analyze(s, [1, 1, m3], T, 'closed');
+    assert(r.consistent, `projection-dependent invariants for row ${i}`);
+    assert.strictEqual(f2trace(Braid.f2Word(r.syz, 0, 1, false)), r.inv.trace, `row ${i}`);
+    n++;
+  }
+  return `${n} orbits`;
+});
+
 if (failures) { console.log(`\n${failures} check(s) failed`); process.exit(1); }
 console.log('\nall checks passed');

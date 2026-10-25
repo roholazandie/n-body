@@ -108,6 +108,9 @@ function physicsFactory(root) {
     const tol = opts.tol || 1e-12, maxSteps = opts.maxSteps || 100000;
     const soft2 = (opts.soft || 0) ** 2;
     const maxDt = opts.maxDt || Infinity;
+    // optional: limit each step to maxPhase × local two-body time r_min^(3/2)/sqrt(M)
+    const maxPhase = opts.maxPhase || 0;
+    const sqrtM = Math.sqrt(m[0] + m[1] + m[2]);
     const KMAX = 10, NY = 9;
     const seq = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20];
     const Aacc = new Float64Array(4);
@@ -176,6 +179,12 @@ function physicsFactory(root) {
       // keep physical steps short enough for smooth Hermite resampling
       const dtStep = yn[0] - y[0];
       if (dtStep > 2 * maxDt) { H *= 0.9 * maxDt / dtStep; continue; }
+      if (maxPhase) {
+        const rmin = Math.min(Math.hypot(y[1], y[2]), Math.hypot(y[3], y[4]), Math.hypot(y[1] + y[3], y[2] + y[4]),
+          Math.hypot(yn[1], yn[2]), Math.hypot(yn[3], yn[4]), Math.hypot(yn[1] + yn[3], yn[2] + yn[4]));
+        const lim = maxPhase * Math.pow(rmin, 1.5) / sqrtM;
+        if (dtStep > 1.5 * lim) { H *= 0.9 * lim / dtStep; continue; }
+      }
       if (yn[0] > tEnd) {
         // land exactly on tEnd: secant iteration on the fictitious step length
         let h0 = 0, f0 = y[0] - tEnd, h1 = H, f1 = yn[0] - tEnd;

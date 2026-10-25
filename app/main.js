@@ -577,6 +577,7 @@
     last = now;
     if (playing) clock += dt * S.speed;
     pump(12);
+    if (S.view === 'lab') { requestAnimationFrame(frame); return; }
     // overlay: grain, hover, labels, loading dots
     octx.setTransform(1, 0, 0, 1, 0, 0);
     octx.clearRect(0, 0, overlay.width, overlay.height);
@@ -714,7 +715,12 @@
   function reproject() { for (const o of cache.values()) if (o.pos) projectOrbit(o); }
 
   function initUI() {
-    const syncView = () => { $('braidOpts').hidden = S.view !== 'braid'; };
+    window.BraidLab.init();
+    const syncView = () => {
+      $('braidOpts').hidden = S.view !== 'braid';
+      $('lab').hidden = S.view !== 'lab';
+      if (S.view === 'lab') { closeFocus(); layoutLab(); window.BraidLab.show(); } else lastView = S.view;
+    };
     seg('viewSeg', 'view', syncView);
     syncView();
     $('braidSpan').addEventListener('input', () => setBraidSpan(spanFromSlider(+$('braidSpan').value)));
@@ -767,7 +773,7 @@
     check('ghost', 'ghost');
     $('pngBtn').onclick = savePNG;
     $('recBtn').onclick = recordLoop;
-    $('panelToggle').onclick = () => $('panel').classList.toggle('open');
+    $('panelToggle').onclick = () => { $('panel').classList.toggle('open'); layoutLab(); };
     if (innerWidth < 900) $('panel').classList.remove('open');
     syncCollectionOpts();
     for (const k of ['llMass', 'llClass', 'llSort']) {
@@ -786,6 +792,7 @@
       if (e.target.matches('input, select, textarea')) return;
       if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
       else if (e.key === 's' || e.key === 'S') $('panel').classList.toggle('open');
+      else if (e.key === 'l' || e.key === 'L') document.querySelector(`#viewSeg [data-v=${S.view === 'lab' ? lastView : 'lab'}]`).click();
       else if (e.key === 'b' || e.key === 'B') document.querySelector(`#viewSeg [data-v=${S.view === 'braid' ? 'orbits' : 'braid'}]`).click();
       else if (e.key === 'Escape') closeFocus();
       else if (e.key === 'ArrowRight' && !focus) gotoPage(S.page + 1);
@@ -913,6 +920,7 @@
     fillICTable(s, m);
     drawDomain();
     if (!o) setTimeout(() => focus && focus.item === item && fillInspector(), 120);
+    fillBraid(item, o);
   }
 
   function fillICTable(s, m) {
@@ -1030,6 +1038,95 @@
       g.beginPath(); g.arc(px, py, 5 * dpr, 0, 7); g.stroke();
     }
   }
+
+  // ---------- braid topology of the focused orbit ----------
+  const braidCache = new Map();
+  let lastView = S.view === 'lab' ? 'orbits' : S.view;
+  function layoutLab() {
+    const wide = innerWidth > 1100 && $('panel').classList.contains('open');
+    $('lab').style.right = wide ? '320px' : '0';
+    if (S.view === 'lab') window.BraidLab.draw();
+  }
+  function orbitRef(item) {
+    if (item.kind === 'classic') return { col: 0, idx: item.idx };
+    if (item.kind === 'll') return { col: 1, idx: item.idx };
+    if (item.kind === 'ff') return { col: 2, idx: item.idx };
+    return null;
+  }
+  // smallest p with w = u^(n/p): shows e.g. the figure-eight as (a B)^3
+  function asPower(word) {
+    const n = word.length;
+    for (let p = 1; p <= n / 2; p++) {
+      if (n % p) continue;
+      let ok = true;
+      for (let i = p; i < n && ok; i++) ok = word[i].gen === word[i - p].gen && word[i].sign === word[i - p].sign;
+      if (ok) return { base: word.slice(0, p), k: n / p };
+    }
+    return null;
+  }
+  function fillBraid(item, o) {
+    const ref = orbitRef(item);
+    const note = $('braidNote'), dl = $('braidDl');
+    if (!ref) { note.textContent = 'Braid invariants are defined for the catalogued periodic orbits.'; dl.innerHTML = ''; return; }
+    const key = item.key;
+    const run = () => {
+      if (!focus || focus.item !== item) return;
+      let r = braidCache.get(key);
+      if (!r) {
+        const { s, m } = itemState(item);
+        const T = item.kind === 'classic' ? (o && o.T) || CLASSICS[item.idx].T : item.kind === 'll' ? llData()[item.idx].T : ffData().T[item.idx];
+        r = Braid.analyze(s, m, T, item.kind === 'ff' ? 'freefall' : 'closed');
+        braidCache.set(key, r);
+      }
+      const census = window.BraidLab.lookup(ref.col, ref.idx);
+      const inv = r.inv, word = r.reduced;
+      const pw = asPower(word);
+      const wordStr = Braid.braidString(word);
+      const short = wordStr.length > 600 ? wordStr.slice(0, 600) + ` … (${word.length} crossings)` : wordStr;
+      const f2 = item.kind === 'ff' ? '' : Braid.f2Word(r.syz, 0, 1, false);
+      const trace = inv.traceDigits <= 24 ? inv.trace.toString() : `≈ 10^${inv.traceDigits - 1} (${inv.traceDigits} digits)`;
+      const T = o && o.Tstar;
+      const rows = [
+        ['Braid β', `<div class="wordbox">${pw && pw.k > 1 ? `(${Braid.braidString(pw.base)})<sup>${pw.k}</sup>` : short || '1 (trivial)'}</div>`],
+        ['Crossings', `${word.length} <span class="muted">(freely reduced)</span>`],
+        ['Permutation', inv.cycle],
+        ['Exponent sum', inv.expSum],
+        ['|tr| in PSL(2,ℤ)', trace],
+        ['Nielsen–Thurston', inv.type],
+      ];
+      if (inv.type === 'pseudo-Anosov') {
+        rows.push(['Dilatation λ', inv.logLambda < 30 ? `${Math.exp(inv.logLambda).toPrecision(6)} <span class="muted">(log λ = ${inv.logLambda.toFixed(4)})</span>` : `e<sup>${inv.logLambda.toFixed(2)}</sup>`]);
+        if (T) rows.push(['log λ / T*', (inv.logLambda / T).toFixed(4) + ' <span class="muted">per unit t*</span>']);
+      }
+      if (f2) rows.push(['Free-group word', `<div class="wordbox">${f2.length > 400 ? f2.slice(0, 400) + ' …' : f2 || '1 (trivial)'}</div>`]);
+      const syzStr = r.syz.map((z) => z.mid + 1).join('');
+      rows.push([item.kind === 'ff' ? 'Syzygies (T/2)' : 'Syzygies', `<div class="wordbox">${syzStr.length > 300 ? syzStr.slice(0, 300) + ' …' : syzStr}</div><span class="muted">${r.syz.length} collinear instants; digit = body in the middle</span>`]);
+      if (census && census.valid >= 0) {
+        const what = ref.col === 1 ? 'free-group word vs Li &amp; Liao' : 'half-period sequence vs Hristov et al.';
+        rows.push(['Published', census.valid === 1 ? `<span class="okc">✓ matches</span> <span class="muted">(${what})</span>` : `✗ differs <span class="muted">(${what})</span>`]);
+      }
+      rows.push(['Projection check', r.consistent ? '<span class="okc">✓</span> same invariants at θ = 0.31, 1.13, 2.02 rad' : '✗ projections disagree']);
+      note.innerHTML = item.kind === 'ff'
+        ? 'Free-fall orbits retrace themselves, so the full-period braid is ββ⁻¹ = 1. Shown: the half-period braid, closed by a straight-line return to the start. Letters: a = σ₁, b = σ₂, A = σ₁⁻¹, B = σ₂⁻¹.'
+        : 'World-lines projected on an axis at θ = 0.31 rad and read upward in time. Letters: a = σ₁, b = σ₂, A = σ₁⁻¹, B = σ₂⁻¹.';
+      dl.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+    };
+    if (braidCache.has(key)) run();
+    else { note.textContent = 'Computing braid…'; dl.innerHTML = ''; setTimeout(run, 30); }
+  }
+
+  window.ThreeBodyApp = {
+    openOrbit(col, idx) {
+      const item = col === 0 ? classicItem(idx) : col === 1 ? llItem(idx) : ffItem(idx);
+      document.querySelector(`#viewSeg [data-v=${lastView === 'lab' ? 'orbits' : lastView}]`).click();
+      setFocusItem(item);
+    },
+    orbitName(col, idx) {
+      if (col === 0) return CLASSICS[idx].name;
+      if (col === 1) { const c = llData()[idx]; return `Li & Liao ${c.name}` + (c.m3 !== 1 ? ` (m₃ = ${c.m3})` : ''); }
+      const D = ffData(); return `Free-fall solution #${D.sol[idx] + 1}` + (D.sd[idx] ? ' · self-dual' : '');
+    },
+  };
 
   // ---------- boot ----------
   resize();

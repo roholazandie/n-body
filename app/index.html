@@ -25,6 +25,7 @@
     <div class="seg" id="viewSeg">
       <button data-v="orbits" class="on">Orbits</button>
       <button data-v="braid">Braids</button>
+      <button data-v="lab" title="Braid invariants of every catalogued orbit (L)">Braid lab</button>
     </div>
     <div id="braidOpts" hidden>
       <p class="hint">World-lines: position along a projection axis (→) against time (↑). At each crossing the strand nearer the viewer passes over. All cells scroll at the same scale-invariant rate.</p>
@@ -175,8 +176,34 @@
     </div>
   </section>
 
-  <footer class="hint">Click a cell to inspect it. Keys: <kbd>Space</kbd> pause, <kbd>S</kbd> settings, <kbd>B</kbd> braids, <kbd>+</kbd>/<kbd>−</kbd> braid zoom, <kbd>←</kbd>/<kbd>→</kbd> page, <kbd>Esc</kbd> back.</footer>
+  <footer class="hint">Click a cell to inspect it. Keys: <kbd>Space</kbd> pause, <kbd>S</kbd> settings, <kbd>B</kbd> braids, <kbd>L</kbd> braid lab, <kbd>+</kbd>/<kbd>−</kbd> braid zoom, <kbd>←</kbd>/<kbd>→</kbd> page, <kbd>Esc</kbd> back.</footer>
 </aside>
+
+<div id="lab" class="lab" hidden>
+  <div class="lab-head">
+    <h2>Braid lab</h2>
+    <p class="sub">Braid invariants of every catalogued periodic orbit, computed from our integrations and checked against the published topology. Hover a point for details; click to open the orbit.</p>
+    <div id="labSummary" class="chips"></div>
+  </div>
+  <div class="lab-controls">
+    <label>Horizontal <select id="labX"></select></label>
+    <label>Vertical <select id="labY"></select></label>
+    <label class="check"><input type="checkbox" id="labLogX"> log x</label>
+    <label class="check"><input type="checkbox" id="labLogY"> log y</label>
+    <div id="labLegend" class="lab-legend"></div>
+  </div>
+  <div class="lab-main">
+    <div class="lab-plotwrap"><canvas id="labPlot" aria-label="Scatter plot of braid invariants"></canvas><div id="labTip" class="tip" hidden></div></div>
+    <aside class="lab-side">
+      <h3>Correlation (visible points)</h3>
+      <div id="labStats"></div>
+      <h3>Nielsen–Thurston type</h3>
+      <div id="labTypes"></div>
+      <p class="hint"><b>log λ</b> is the braid's dilatation: any motion realising the braid stretches its surroundings at least by λ per period. The braid is read from the world-lines projected on an axis; its conjugacy class (hence λ, type, permutation, exponent sum) does not depend on the axis.</p>
+      <p class="hint"><b>Free fall</b> orbits retrace themselves, so their full-period braid is trivial (ββ⁻¹ = 1); the census uses the half-period braid closed by a straight-line return. Lyapunov exponents are from Hristov et al.</p>
+    </aside>
+  </div>
+</div>
 
 <aside id="inspector" class="inspector" hidden>
   <header>
@@ -191,6 +218,12 @@
     <p class="hint">Body 1 starts at P(x, y); bodies 2, 3 at (∓0.5, 0); all at rest. Dots: the 24,582 periodic i.c.s. Click to load the nearest periodic orbit, or <label class="inline"><input type="checkbox" id="freePick"> simulate any point</label>.</p>
     <canvas id="domain" width="300" height="300"></canvas>
     <div class="legend"><span><i class="dot a"></i>periodic i.c.</span><span><i class="dot b"></i>self-dual</span><span><i class="dot c"></i>current</span></div>
+  </section>
+
+  <section id="braidSec">
+    <h3>Braid topology</h3>
+    <p id="braidNote" class="hint"></p>
+    <dl id="braidDl"></dl>
   </section>
 
   <section id="stabSec">
@@ -232,9 +265,12 @@
 
 <script src="physics.js"></script>
 <script src="gl-trails.js"></script>
+<script src="braid.js"></script>
 <script src="classics.js"></script>
 <script src="orbits-data.js"></script>
 <script src="liao-data.js"></script>
+<script src="braid-data.js"></script>
+<script src="lab.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

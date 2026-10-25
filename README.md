@@ -26,11 +26,12 @@ python3 -m http.server -d app 8000   # then open http://localhost:8000
 
 - **Grid of live orbits** — any rows × columns, paging/shuffling through each catalogue, filters (mass ratio, symmetry class, self-dual, T* range) and sorting (T*, word length, Lyapunov exponent, random).
 - **Braid view** (`B`) — each body becomes a world-line: position projected on an adjustable axis (→) against time (↑). The bodies ride a "now" line while their history scrolls down; at every crossing the strand nearer the viewer passes over, as in a braid diagram. The time window is in scale-invariant time t\* so every cell scrolls at the same rate.
-- **Inspector** (click a cell) — full-precision initial conditions, period, T\* = T|E|³ᐟ², energy, Lyapunov exponent, dual i.c.; an Agekyan–Anosova domain map of all 24,582 free-fall i.c.s (click to load the nearest, or simulate any point); a **stability test** that nudges a body by 10⁻ⁿ and integrates several periods; and a **custom initial-conditions** editor (masses, positions, velocities).
+- **Braid lab** (`L`): a census of the braid of every catalogued orbit (14,473 in all). Plot braid entropy log λ against T\*, crossings, syzygies, word length or the Lyapunov exponent, with correlation and Nielsen–Thurston type tables. The census is validated against the published topology: 2,043/2,044 Li & Liao free-group words (the remaining entry is an error in the published table) and 236/236 self-dual syzygy sequences. Click a point to open that orbit.
+- **Inspector** (click a cell) — full-precision initial conditions, period, T\* = T|E|³ᐟ², energy, Lyapunov exponent, dual i.c.; **braid topology**: the braid word (e.g. the figure-eight is (σ₁σ₂⁻¹)³), Nielsen–Thurston type, dilatation, free-group word and syzygy sequence; an Agekyan–Anosova domain map of all 24,582 free-fall i.c.s (click to load the nearest, or simulate any point); a **stability test** that nudges a body by 10⁻ⁿ and integrates several periods; and a **custom initial-conditions** editor (masses, positions, velocities).
 - **Look** — palettes (incl. custom), trail length/width, glow, body size (scaled by m¹ᐟ³), ghost path, equal-duration or T\*-proportional loops.
 - **Export** — PNG snapshot or a WebM/MP4 recording of one full loop.
 
-Keys: `Space` pause · `S` settings · `B` braids · `←`/`→` page · `Esc` back.
+Keys: `Space` pause · `S` settings · `B` braids · `L` braid lab · `←`/`→` page · `Esc` back.
 
 <p align="center"><img src="docs/braids.jpg" width="49%" alt="Braid view"> <img src="docs/focus.jpg" width="40%" alt="Broucke A2"></p>
 
@@ -54,13 +55,18 @@ app/
   main.js                 collections, grid, inspector, braid view, export
   physics.js              regularized integrator (also loadable from Node)
   gl-trails.js            WebGL trail / braid / bloom renderer
+  braid.js                syzygies, free-group words, braid words, invariants (also loadable from Node)
+  lab.js                  braid lab view
+  braid-data.js           braid census (generated)
   classics.js             initial conditions of the classic gallery
   orbits-data.js          Hristov et al. free-fall catalogue (generated)
   liao-data.js            Li & Liao catalogues (generated)
 scripts/
   build-data.js           regenerate the two data files from the published sources
+  braid-census.js         regenerate app/braid-data.js (all cores, about a minute)
   test-physics.js         regression checks of the integrator against the catalogues
 docs/                     screenshots
+genealogy_time.tex        companion paper (build with tectonic or pdflatex)
 ```
 
 ```sh
