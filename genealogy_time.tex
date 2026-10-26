@@ -51,6 +51,8 @@ mass ratio, braid entropy grows linearly with the scale-invariant period. Braid 
 orbit's Lyapunov exponent. Hierarchical orbits are exactly the reducible braids.
 A second census of 794 orbits confirms the lifetime law: measured lifetimes give exponents within a median of
 $0.5\%$ of the monodromy exponent for unstable classic and Li--Liao orbits.
+Clouds of nearby states, in the three-body problem and the Chirikov standard map, split into objects exactly when
+their size times the finite-time stretching of their centre reaches the resolution.
 The symbolic $n$-cylinders of the dynamics carry a genealogical probability structure (a filtration,
 conditional measures that are exact mixtures of their descendants, a martingale of refining predictions and
 a scale decomposition of Kullback--Leibler divergence), and the tree is \emph{grown} by time rather than
@@ -834,6 +836,88 @@ therefore a landscape of permanent objects embedded among forms that are born an
 observation decides how much of the chaotic sea appears solid. This is also the honest limit of the
 gravitational example: three-body phase space is mostly chaotic sea, so its forms are short-lived.
 
+\subsection{Measured: objects in evolving clouds}
+\label{sec:clouds}
+
+The instrument's ``Clouds'' view puts these definitions into practice
+(\texttt{app/clouds.js}). A cloud of $N=200$ states, uniform in a ball of radius $\delta_0$ around a chosen
+state, is evolved. Two members belong to one object at $(\varepsilon,t)$ if their distance stayed within
+$\varepsilon$ over $[0,t]$. With $D_{ij}(t)=\max_{s\le t}d_{ij}(s)$, objects are therefore sets of $D$-diameter at
+most $\varepsilon$, that is, complete-linkage clusters of $D(t)$. We compute them for every frame in $O(N^2)$ with
+the nearest-neighbour-chain algorithm. Because $D$ only grows, the complete-linkage dendrogram is ultrametric,
+and it only gains branches as $t$ grows or $\varepsilon$ shrinks. This is the object hierarchy of the definition
+above, and the count $N(\varepsilon,t)$ is read off it for any $\varepsilon$. Single linkage would not do: a
+continuously stretched filament stays chained together at every scale and would never split.
+
+\paragraph{The linear prediction.} The prediction does not look at the cloud. Let $\Lambda(t)=\|D\Phi_t\|$ be
+the largest singular value of the linearised flow along the orbit of the cloud's centre, and $\Lambda^*$ its
+running maximum. The running maximum is needed because $D$ is a running maximum and the stretching pulses within a
+period, peaking at close encounters. The cloud becomes a filament of length about $\delta_0\Lambda^*(t)$, so it
+should first split when
+\begin{equation}
+  \delta_0\,\Lambda^*(t_{\text{split}})=\varepsilon ,
+  \label{eq:splitmeasured}
+\end{equation}
+and then hold about $\delta_0\Lambda^*(t)/\varepsilon$ objects. In chaos $\Lambda\sim e^{\lambda t}$, which
+recovers \eqref{eq:split}. On a KAM torus $\Lambda$ grows only linearly, because the cloud merely shears. For the
+standard map $\Lambda$ comes from the product of $2\times2$ tangent maps. For the three-body problem it comes from
+twelve central-difference trajectories ($h=10^{-9}$) integrated to land exactly on every frame time. Hermite
+resampling of each run on its own step grid adds about $10^{-9}$ of noise near close encounters, which
+finite differences turn into false spikes in $\Lambda$.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llrr@{}}
+\toprule
+System & cloud & first split & $\delta_0\Lambda^*=\varepsilon$\\
+\midrule
+Standard map, $K=0.9716$ & KAM island $(\pi,1)$, $\varepsilon=10^{-2}$ & 139 & 132\\
+ & KAM island, $\varepsilon=10^{-3}$ & 13 & 13\\
+ & separatrix layer $(0.05,0.05)$, $\varepsilon=10^{-2}$ & 9 & 9\\
+Three-body, $\varepsilon=10^{-2}$ & figure-eight ($\lambda_p\approx0$) & none in 20 & none\\
+ & Butterfly~I ($\lambda_p=0.57$) & 11.6 & 11.1\\
+ & Li--Liao I.A~6, $m_3=0.5$ ($\lambda_p=2.7$) & 3.47 & 3.47\\
+ & Lagrange triangle ($\lambda_p=4.4$) & 3.10 & 3.08\\
+ & free fall, solution \#2 ($\lambda_p=15.4$) & 1.12 & 1.10\\
+\bottomrule
+\end{tabular}
+\caption{First split of a 200-member cloud: measured, and predicted from the stretching of its centre alone
+(iterations for the standard map, periods for the three-body problem; $\delta_0=10^{-4}$ and $10^{-6}$--$10^{-9}$).}
+\label{tab:clouds}
+\end{table}
+
+\paragraph{Results.} Table~\ref{tab:clouds} shows that \eqref{eq:splitmeasured} holds to a few per cent in
+every case. More than the first split agrees: for the Li--Liao orbit, the cloud's running diameter stays at
+$0.84$--$1.00$ times $\delta_0\Lambda^*(t)$ over nearly six decades of growth. The long-run exponent alone would
+have failed. A cloud placed on the separatrix of the hyperbolic point $(0,0)$ of the standard map splits after
+9 iterations, but $\ln(\varepsilon/\delta_0)/\lambda$ with the long-run $\lambda=0.135$ predicts 29. Near the
+fixed point the local stretching is $\ln2.6$ per iteration, and the chaotic layer's average is lowered by time
+spent near sticky islands. So objects are created at the \emph{finite-time} rate of the place where they are,
+not at an ergodic average. In the KAM island the long-run $\lambda$ is $0.002$. The cloud stays one object at
+$\varepsilon=10^{-2}$ for 139 iterations, and only shear eventually separates it. After the first split, the
+growth rate of $\ln N$ is the measured $h(\varepsilon)$: $0.44$, $2.96$ and $19.7$ per period against
+$\lambda_p=0.57$, $2.7$ and $15.4$. For the Lagrange triangle it is higher ($6.2$ against $4.4$), presumably because the cloud resolves more
+than one expanding direction there. The first split is also a threshold crossing of a pulsing quantity, so its timing can
+jump to the next close encounter, much like the lifetime staircase of Section~\ref{sec:lifetimes}.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.40\linewidth]{docs/cloud-chaos.jpg}\hfill
+  \begin{minipage}[b]{0.57\linewidth}
+    \includegraphics[width=0.49\linewidth]{docs/cloud-count-island.jpg}\hfill
+    \includegraphics[width=0.49\linewidth]{docs/cloud-count-chaos.jpg}\\[4pt]
+    \centering\includegraphics[width=0.49\linewidth]{docs/cloud-count-liao.jpg}
+  \end{minipage}
+  \caption{Objects at finite resolution. Left: a 200-member standard-map cloud ($\delta_0=10^{-4}$, $K=0.9716$)
+  started on the separatrix layer (circle), after 30 iterations: stretched along the unstable manifold and
+  resolved at $\varepsilon=10^{-2}$ into many objects (the three largest coloured, the rest grey) over the phase
+  portrait. Right: $N(\varepsilon,t)$ on a logarithmic scale for $\varepsilon=10^{-2}$ (orange), other
+  $\varepsilon$ from $10^{-5}$ to $1$ (grey) and the prediction $\delta_0\Lambda^*(t)/\varepsilon$ (dashed). Top left:
+  a cloud in a KAM island, which stays one object for 139 iterations. Top right: the chaotic cloud. Bottom: a
+  three-body cloud around Li--Liao I.A~6 over 8 periods.}
+  \label{fig:clouds}
+\end{figure}
+
 \subsection{Information and computation}
 
 Splitting a class has a ledger. Information is produced at rate $h(\varepsilon,\tau)$; erasing a distinction
@@ -864,11 +948,10 @@ Each step uses the integrator already validated in Section~\ref{sec:instrument}.
 \item \textbf{Lifetimes} (\emph{done} for perturbed periodic orbits, Section~\ref{sec:lifetimes}). Open: the meet
       depth $|\omega\wedge p|$ for generic trajectories that pass near periodic orbits. Measure it for ensembles of such
       trajectories and compare it with \eqref{eq:lifetime}.
-\item \textbf{Objects at scale.} Evolve clouds of $10^2$--$10^3$ nearby i.c.s, cluster them by
-      $\varepsilon$-closeness over time, and measure $N(\varepsilon,t)$, the object dendrogram,
-      $\lambda(\delta)$ and $h(\varepsilon)$, both near three-body periodic orbits and in the Chirikov standard
-      map \cite{Chirikov1979}, where clouds on KAM tori should never split while clouds in the chaotic sea
-      split at rate $h(\varepsilon)$, as predicted by \eqref{eq:split}.
+\item \textbf{Objects at scale} (\emph{done}, Section~\ref{sec:clouds}): clouds in the standard map
+      \cite{Chirikov1979} and around three-body periodic orbits, with $N(\varepsilon,t)$, the dendrogram and the
+      first split predicted by $\delta_0\Lambda^*(t)=\varepsilon$. Open: the finite-size exponent
+      $\lambda(\delta)$, and $h(\varepsilon)$ from much larger clouds, where the count is not capped by $N$.
 \end{enumerate}
 
 %=====================================================================
@@ -887,7 +970,9 @@ object scale-dependent, and chaos couples scale to time: what is one thing now b
 first of these statements, about braids, are now measurements. A census of 14{,}473 orbits, validated against the
 published topology, shows the figure-eight to be the golden braid cubed. It finds a linear law between
 topological entropy and period. It shows that the complexity of a form is independent of its instability. A second census shows forms dying at
-the rate the monodromy predicts, $\tau\approx\ln(\delta/\varepsilon)/\lambda_p$.
+the rate the monodromy predicts, $\tau\approx\ln(\delta/\varepsilon)/\lambda_p$. Clouds of nearby states break into
+objects when their size times the finite-time stretching of their centre reaches the resolution, while clouds on
+KAM tori stay whole.
 The remaining proposals of Section~\ref{sec:programme} are designed to do the same for the genealogical and
 scale-dependent claims.
 

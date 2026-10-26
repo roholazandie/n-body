@@ -26,6 +26,7 @@
       <button data-v="orbits" class="on">Orbits</button>
       <button data-v="braid">Braids</button>
       <button data-v="lab" title="Braid invariants of every catalogued orbit (L)">Braid lab</button>
+      <button data-v="clouds" title="Objects at finite resolution: clouds of nearby states (C)">Clouds</button>
     </div>
     <div id="braidOpts" hidden>
       <p class="hint">World-lines: position along a projection axis (→) against time (↑). At each crossing the strand nearer the viewer passes over. All cells scroll at the same scale-invariant rate.</p>
@@ -176,7 +177,7 @@
     </div>
   </section>
 
-  <footer class="hint">Click a cell to inspect it. Keys: <kbd>Space</kbd> pause, <kbd>S</kbd> settings, <kbd>B</kbd> braids, <kbd>L</kbd> braid lab, <kbd>+</kbd>/<kbd>−</kbd> braid zoom, <kbd>←</kbd>/<kbd>→</kbd> page, <kbd>Esc</kbd> back.</footer>
+  <footer class="hint">Click a cell to inspect it. Keys: <kbd>Space</kbd> pause, <kbd>S</kbd> settings, <kbd>B</kbd> braids, <kbd>L</kbd> braid lab, <kbd>C</kbd> clouds, <kbd>+</kbd>/<kbd>−</kbd> braid zoom, <kbd>←</kbd>/<kbd>→</kbd> page, <kbd>Esc</kbd> back.</footer>
 </aside>
 
 <div id="lab" class="lab" hidden>
@@ -209,6 +210,49 @@
       <p class="hint lab-life" hidden><b>Rings</b>: orbits passing within 10⁻⁷ of a binary collision, where the finite-difference monodromy is unreliable (every free-fall orbit off the published exponent by more than 1% is one of them); they are left out of the statistics. Orbits with large λ_p lose their form within about a period over the whole ε range. Forms break only at close encounters, so the lifetime moves in steps and the slope is coarse there. Stable orbits (figure-eight, Broucke, Bumblebee, many Li &amp; Liao orbits) keep their form for all 40 periods.</p>
       <p class="hint lab-braid"><b>log λ</b> is the braid's dilatation: any motion realising the braid stretches its surroundings at least by λ per period. The braid is read from the world-lines projected on an axis; its conjugacy class (hence λ, type, permutation, exponent sum) does not depend on the axis.</p>
       <p class="hint lab-braid"><b>Free fall</b> orbits retrace themselves, so their full-period braid is trivial (ββ⁻¹ = 1); the census uses the half-period braid closed by a straight-line return. Lyapunov exponents are from Hristov et al.</p>
+    </aside>
+  </div>
+</div>
+
+<div id="clouds" class="lab" hidden>
+  <div class="lab-head">
+    <h2>Clouds: objects at finite resolution</h2>
+    <div class="seg lab-mode" id="cloudSys">
+      <button data-s="std" class="on">Standard map</button>
+      <button data-s="tb">Three-body</button>
+    </div>
+    <p class="sub">A cloud of nearby states evolves. Two members are <b>one object at resolution ε</b> if their distance stayed within ε over the whole time so far, so objects are complete-linkage clusters of the running-maximum distance. Objects only ever split as time runs or as ε shrinks. The linear prediction comes from the stretching of the cloud's centre, Λ(t) = ‖DΦ<sub>t</sub>‖, or rather its running maximum Λ*(t), since objects use running-maximum distances. The cloud becomes a filament of length δ₀Λ*(t), holding about δ₀Λ*(t)/ε objects. In chaos Λ ~ e<sup>λt</sup>, so the first split is at t ≈ ln(ε/δ₀)/λ. On a KAM torus Λ grows only linearly, because the cloud just shears.</p>
+  </div>
+  <div class="lab-controls">
+    <label class="cl-std">K <input type="number" id="clK" value="0.971635" min="0" max="5" step="0.05"></label>
+    <div class="cl-std btns cl-presets">
+      <button id="clIsland" title="A cloud inside the island around the elliptic point (π, 0)">KAM island</button>
+      <button id="clChaos" title="A cloud on the separatrix layer of the hyperbolic point (0, 0)">Chaotic sea</button>
+      <span class="muted">or click the portrait</span>
+    </div>
+    <label class="cl-tb" hidden>Orbit <select id="clOrbit"></select></label>
+    <label>Members <select id="clN"><option>100</option><option selected>200</option><option>300</option></select></label>
+    <label>Cloud radius δ₀ 10^<input type="number" id="clR0" value="-4" min="-10" max="-1" step="1"></label>
+    <label class="cl-eps">Resolution ε <output id="clEpsOut"></output><input type="range" id="clEps" min="-6" max="0.5" step="0.05" value="-2"></label>
+  </div>
+  <div class="lab-main">
+    <div class="lab-plotwrap">
+      <canvas id="clPhase" aria-label="Cloud members coloured by object"></canvas>
+      <div class="cl-time">
+        <button id="clPlay" title="Play or pause">❚❚</button>
+        <input type="range" id="clT" min="0" max="1" step="1" value="0" aria-label="Time">
+        <output id="clTOut"></output>
+      </div>
+      <p id="clMsg" class="cl-msg"></p>
+    </div>
+    <aside class="lab-side">
+      <h3>Objects over time N(ε, t)</h3>
+      <canvas id="clCount" class="cl-chart" aria-label="Number of objects against time"></canvas>
+      <div class="legend" id="clCountLegend"></div>
+      <h3>Hierarchy now (dendrogram)</h3>
+      <canvas id="clDendro" class="cl-chart" aria-label="Dendrogram of objects"></canvas>
+      <dl id="clStats"></dl>
+      <p class="hint">Colours: the three largest objects at ε; all others in grey. The dendrogram is ultrametric: cutting it at ε (dashed) gives the objects, and it only gains branches as time runs.</p>
     </aside>
   </div>
 </div>
@@ -291,6 +335,8 @@
 <script src="lifetime.js"></script>
 <script src="lifetime-data.js"></script>
 <script src="lab.js"></script>
+<script src="clouds.js"></script>
+<script src="clouds-view.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

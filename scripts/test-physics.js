@@ -162,6 +162,49 @@ check('braid trace equals the free-group-word trace via Γ(2) (every 25th Li & L
     assert(q.points.every((p) => p.censored), 'figure-eight should keep its form');
     return `λ_fit/λ_p = ${(r.fit.lambda / r.lambdaP).toFixed(3)}`;
   });
+  const Clouds = require(path.join(APP, 'clouds.js'));
+  check('complete linkage (nearest-neighbour chain) equals the naive O(N³) algorithm', () => {
+    const rnd = Clouds.rng(5), N = 40, P = Array.from({ length: N }, () => [rnd(), rnd(), rnd()]);
+    const D = new Float64Array(N * N);
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) D[i * N + j] = Math.hypot(P[i][0] - P[j][0], P[i][1] - P[j][1], P[i][2] - P[j][2]);
+    let cl = P.map((_, i) => [i]); const naive = [];
+    while (cl.length > 1) {
+      let best = Infinity, bi = 0, bj = 1;
+      for (let i = 0; i < cl.length; i++) for (let j = i + 1; j < cl.length; j++) {
+        let d = 0; for (const a of cl[i]) for (const b of cl[j]) d = Math.max(d, D[a * N + b]);
+        if (d < best) { best = d; bi = i; bj = j; }
+      }
+      naive.push(best); cl[bi] = cl[bi].concat(cl[bj]); cl.splice(bj, 1);
+    }
+    naive.sort((a, b) => a - b);
+    const fast = Clouds.completeLinkage(Float64Array.from(D), N).map((m) => m.h);
+    assert(naive.every((h, i) => Math.abs(h - fast[i]) < 1e-12));
+  });
+  await checkAsync('standard map: a cloud in a KAM island stays one object, a chaotic cloud splits when δ₀Λ*(t) = ε', async () => {
+    const K = 0.971635, eps = 1e-3, out = [];
+    for (const [x0, p0] of [[Math.PI, 1.0], [0.05, 0.05]]) {
+      const cl = Clouds.stdCloud(x0, p0, K, 150, 1e-4, 200, 1), h = await Clouds.history(cl);
+      const L = Clouds.runningMax(Clouds.stdStretch(x0, p0, K, 200)), d0 = h.heights[0][148];
+      const first = h.heights.findIndex((q) => Clouds.countObjects(q, eps) > 1);
+      const pred = L.findIndex((l) => d0 * Math.exp(l) >= eps);
+      assert(Math.abs(first - pred) <= Math.max(2, 0.1 * pred), `first split ${first}, predicted ${pred}`);
+      out.push(`${first}/${pred}`);
+    }
+    const island = Clouds.stdCloud(Math.PI, 1.0, K, 150, 1e-4, 100, 1), hi = await Clouds.history(island);
+    assert.strictEqual(Clouds.countObjects(hi.heights[100], 1e-2), 1, 'island cloud should be one object at ε = 10⁻² after 100 iterations');
+    return `first split measured/predicted (iterations): island ${out[0]}, chaos ${out[1]}`;
+  });
+  await checkAsync('three-body cloud (Li & Liao I.A 6, m₃ = 0.5): its diameter follows δ₀Λ*(t) through the linear regime', async () => {
+    const [, m3, v1, v2, T] = loadData('liao-data.js', 'LIAO_DATA')[700].map(Number);
+    const s = [-1, 0, 1, 0, 0, 0, v1, v2, v1, v2, -2 * v1 / m3, -2 * v2 / m3], m = [1, 1, m3], eps = 1e-2;
+    const cl = await Clouds.threeBodyCloud(s, m, 6 * T, 200, 1e-8, 121), h = await Clouds.history(cl);
+    const L = Clouds.runningMax(Clouds.tbStretch(s, m, 6 * T, 121)), d0 = h.heights[0][198];
+    // the running diameter is the largest merge height; compare with δ₀Λ*(t) while the cloud is still small
+    let lo = Infinity, hi = 0, n = 0;
+    h.heights.forEach((q, k) => { const r = q[198] / (d0 * Math.exp(L[k])); if (q[198] < eps) { lo = Math.min(lo, r); hi = Math.max(hi, r); n++; } });
+    assert(lo > 0.7 && hi < 1.1, `diameter / δ₀Λ* in [${lo}, ${hi}]`);
+    return `diameter / δ₀Λ* = ${lo.toFixed(2)}…${hi.toFixed(2)} over ${n} frames (${Math.log10(eps / d0).toFixed(1)} decades of growth)`;
+  });
   if (failures) { console.log(`\n${failures} check(s) failed`); process.exit(1); }
   console.log('\nall checks passed');
 })();

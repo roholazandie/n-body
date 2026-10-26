@@ -28,11 +28,12 @@ python3 -m http.server -d app 8000   # then open http://localhost:8000
 - **Braid view** (`B`) — each body becomes a world-line: position projected on an adjustable axis (→) against time (↑). The bodies ride a "now" line while their history scrolls down; at every crossing the strand nearer the viewer passes over, as in a braid diagram. The time window is in scale-invariant time t\* so every cell scrolls at the same rate.
 - **Braid lab** (`L`): a census of the braid of every catalogued orbit (14,473 in all). Plot braid entropy log λ against T\*, crossings, syzygies, word length or the Lyapunov exponent, with correlation and Nielsen–Thurston type tables. The census is validated against the published topology: 2,043/2,044 Li & Liao free-group words (the remaining entry is an error in the published table) and 236/236 self-dual syzygy sequences. Click a point to open that orbit.
   A second mode, **Form lifetimes**, tests how long forms survive. Each orbit is nudged by ε = 10⁻³ … 10⁻¹³ and run until its syzygy sequence first deviates. The measured lifetimes follow τ ≈ ln(δ/ε)/λ_p, with λ_p from the monodromy matrix: median λ_fit/λ_p = 0.995 for unstable Li & Liao orbits, and λ_p matches the published free-fall Lyapunov exponents to within 1%.
+- **Clouds** (`C`): objects at finite resolution. A cloud of 200 nearby states evolves, in the Chirikov standard map (a KAM island or the chaotic sea; click the portrait to place a cloud) or around a three-body orbit. Two members are one object at resolution ε if they have stayed within ε of each other so far. The view shows the cloud coloured by object, the count N(ε, t), and the dendrogram, which only gains branches as time runs. The first split matches the prediction from the stretching of the cloud's centre, δ₀Λ*(t) = ε, to within a few percent.
 - **Inspector** (click a cell) — full-precision initial conditions, period, T\* = T|E|³ᐟ², energy, Lyapunov exponent, dual i.c.; **braid topology**: the braid word (e.g. the figure-eight is (σ₁σ₂⁻¹)³), Nielsen–Thurston type, dilatation, free-group word and syzygy sequence; **form lifetime**: lifetime against perturbation size, from the census or computed live; an Agekyan–Anosova domain map of all 24,582 free-fall i.c.s (click to load the nearest, or simulate any point); a **stability test** that nudges a body by 10⁻ⁿ and integrates several periods; and a **custom initial-conditions** editor (masses, positions, velocities).
 - **Look** — palettes (incl. custom), trail length/width, glow, body size (scaled by m¹ᐟ³), ghost path, equal-duration or T\*-proportional loops.
 - **Export** — PNG snapshot or a WebM/MP4 recording of one full loop.
 
-Keys: `Space` pause · `S` settings · `B` braids · `L` braid lab · `←`/`→` page · `Esc` back.
+Keys: `Space` pause · `S` settings · `B` braids · `L` braid lab · `C` clouds · `←`/`→` page · `Esc` back.
 
 <p align="center"><img src="docs/braids.jpg" width="49%" alt="Braid view"> <img src="docs/focus.jpg" width="40%" alt="Broucke A2"></p>
 
@@ -59,6 +60,8 @@ app/
   braid.js                syzygies, free-group words, braid words, invariants (also loadable from Node)
   lifetime.js             form lifetimes: Newton refinement, monodromy exponent, perturbed runs (also loadable from Node)
   lab.js                  braid lab view (braid entropy and form lifetimes)
+  clouds.js               clouds: standard map, three-body clouds, complete-linkage objects (also loadable from Node)
+  clouds-view.js          clouds view
   braid-data.js           braid census (generated)
   lifetime-data.js        lifetime census (generated)
   classics.js             initial conditions of the classic gallery

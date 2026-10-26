@@ -87,6 +87,18 @@ table.ic td:first-child { width: 14px; }
 .zoomctl button:disabled { opacity: .35; cursor: default; }
 .zoomctl span { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
+/* clouds */
+#clouds .lab-plotwrap { height: min(74vh, 780px); align-self: start; }
+.cl-presets { display: flex; gap: 8px; align-items: center; margin-bottom: 2px; }
+.cl-eps { min-width: 260px; }
+#clPhase { position: absolute; left: 0; top: 0; width: 100%; height: calc(100% - 44px); cursor: crosshair; }
+.cl-time { position: absolute; left: 10px; right: 10px; bottom: 8px; display: flex; gap: 10px; align-items: center; }
+.cl-time input { flex: 1; }
+.cl-time button { width: 34px; padding: 4px 0; }
+.cl-time output { font-size: 11px; color: var(--muted); min-width: 120px; text-align: right; font-variant-numeric: tabular-nums; }
+.cl-msg { position: absolute; left: 14px; top: 8px; margin: 0; font-size: 12px; color: var(--muted); pointer-events: none; }
+.cl-chart { width: 100%; height: 170px; display: block; background: #08070c; border-radius: 6px; margin: 2px 0 6px; }
+
 /* braid lab */
 .lab { position: fixed; top: 0; bottom: 0; left: 0; right: 0; z-index: 12; background: var(--bg); overflow: auto;
   padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 12px; }

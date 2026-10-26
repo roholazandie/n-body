@@ -577,7 +577,7 @@
     last = now;
     if (playing) clock += dt * S.speed;
     pump(12);
-    if (S.view === 'lab') { requestAnimationFrame(frame); return; }
+    if (S.view === 'lab' || S.view === 'clouds') { requestAnimationFrame(frame); return; }
     // overlay: grain, hover, labels, loading dots
     octx.setTransform(1, 0, 0, 1, 0, 0);
     octx.clearRect(0, 0, overlay.width, overlay.height);
@@ -719,7 +719,11 @@
     const syncView = () => {
       $('braidOpts').hidden = S.view !== 'braid';
       $('lab').hidden = S.view !== 'lab';
-      if (S.view === 'lab') { closeFocus(); layoutLab(); window.BraidLab.show(); } else lastView = S.view;
+      $('clouds').hidden = S.view !== 'clouds';
+      if (S.view === 'lab') { closeFocus(); layoutLab(); window.BraidLab.show(); }
+      else if (S.view === 'clouds') { closeFocus(); layoutLab(); window.CloudView.show(); }
+      else lastView = S.view;
+      if (S.view !== 'clouds' && window.CloudView) window.CloudView.hide();
     };
     seg('viewSeg', 'view', syncView);
     syncView();
@@ -793,6 +797,7 @@
       if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
       else if (e.key === 's' || e.key === 'S') $('panel').classList.toggle('open');
       else if (e.key === 'l' || e.key === 'L') document.querySelector(`#viewSeg [data-v=${S.view === 'lab' ? lastView : 'lab'}]`).click();
+      else if (e.key === 'c' || e.key === 'C') document.querySelector(`#viewSeg [data-v=${S.view === 'clouds' ? lastView : 'clouds'}]`).click();
       else if (e.key === 'b' || e.key === 'B') document.querySelector(`#viewSeg [data-v=${S.view === 'braid' ? 'orbits' : 'braid'}]`).click();
       else if (e.key === 'Escape') closeFocus();
       else if (e.key === 'ArrowRight' && !focus) gotoPage(S.page + 1);
@@ -1042,11 +1047,13 @@
 
   // ---------- braid topology of the focused orbit ----------
   const braidCache = new Map();
-  let lastView = S.view === 'lab' ? 'orbits' : S.view;
+  let lastView = S.view === 'lab' || S.view === 'clouds' ? 'orbits' : S.view;
   function layoutLab() {
     const wide = innerWidth > 1100 && $('panel').classList.contains('open');
     $('lab').style.right = wide ? '320px' : '0';
+    $('clouds').style.right = wide ? '320px' : '0';
     if (S.view === 'lab') window.BraidLab.draw();
+    if (S.view === 'clouds') window.CloudView.draw();
   }
   function orbitRef(item) {
     if (item.kind === 'classic') return { col: 0, idx: item.idx };
@@ -1260,7 +1267,7 @@
   window.ThreeBodyApp = {
     openOrbit(col, idx) {
       const item = col === 0 ? classicItem(idx) : col === 1 ? llItem(idx) : ffItem(idx);
-      document.querySelector(`#viewSeg [data-v=${lastView === 'lab' ? 'orbits' : lastView}]`).click();
+      document.querySelector(`#viewSeg [data-v=${lastView === 'lab' || lastView === 'clouds' ? 'orbits' : lastView}]`).click();
       setFocusItem(item);
     },
     orbitName(col, idx) {
