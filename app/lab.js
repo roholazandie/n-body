@@ -33,8 +33,9 @@
     // linearly stable orbits (λ_p < 0.05) have no linear lifetime law: their breakup at large ε is nonlinear
     lambdaFit: { label: 'Lifetime exponent λ_fit = 1 / slope (measured)', get: (r) => (r.lambdaP < 0.05 ? NaN : r.lambdaFit), lam: true },
     ratio: { label: 'λ_fit / λ_p', get: (r) => (r.lambdaP < 0.05 ? NaN : r.lambdaFit / r.lambdaP) },
-    epsCat: { label: 'Published i.c.: effective distance from the orbit (log₁₀)', get: (r) => r.epsCat },
-    closure0: { label: 'Published i.c.: closure after one period (log₁₀)', get: (r) => r.closure0 },
+    // stored as log₁₀ in the census: back to linear values so the log-axis toggle applies as for other axes
+    epsCat: { label: 'Published i.c.: effective distance from the orbit', get: (r) => 10 ** r.epsCat },
+    closure0: { label: 'Published i.c.: closure after one period', get: (r) => 10 ** r.closure0 },
     base: { label: 'Lifetime of the catalogue i.c. (periods)', get: (r) => r.base },
   };
 
@@ -52,8 +53,8 @@
     lrows = window.LIFETIME_DATA.split('\n').map((l) => {
       const p = l.split(',');
       return { col: +p[0], idx: +p[1], Tstar: +p[2], lambdaP: num(p[3]), lambdaCat: num(p[4]), lambdaFit: num(p[5]),
-        r2: num(p[6]), eps0: num(p[7]), delta: num(p[8]), base: +p[9], baseCensored: p[10] === '1', nSyz: +p[11],
-        epsCat: num(p[12]), closure0: num(p[13]), closure: num(p[14]), rmin: num(p[15]), taus: p[16].split(' ').map(Number),
+        r2: num(p[6]), eps0: num(p[7]), delta: num(p[8]), base: num(p[9]), baseCensored: p[10] === '1', nSyz: +p[11],
+        epsCat: num(p[12]), closure0: num(p[13]), closure: num(p[14]), rmin: num(p[15]), taus: p[16].split(' ').map(num),
         nearCollision: num(p[15]) < -7 };
     });
     return lrows;

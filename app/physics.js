@@ -179,10 +179,12 @@ function physicsFactory(root) {
       // keep physical steps short enough for smooth Hermite resampling
       const dtStep = yn[0] - y[0];
       if (dtStep > 2 * maxDt) { H *= 0.9 * maxDt / dtStep; continue; }
+      const Hstep = H;
+      let lim = Infinity;
       if (maxPhase) {
         const rmin = Math.min(Math.hypot(y[1], y[2]), Math.hypot(y[3], y[4]), Math.hypot(y[1] + y[3], y[2] + y[4]),
           Math.hypot(yn[1], yn[2]), Math.hypot(yn[3], yn[4]), Math.hypot(yn[1] + yn[3], yn[2] + yn[4]));
-        const lim = maxPhase * Math.pow(rmin, 1.5) / sqrtM;
+        lim = maxPhase * Math.pow(rmin, 1.5) / sqrtM;
         if (dtStep > 1.5 * lim) { H *= 0.9 * lim / dtStep; continue; }
       }
       if (yn[0] > tEnd) {
@@ -197,6 +199,8 @@ function physicsFactory(root) {
         // Only snap the clock when the secant actually converged; otherwise keep the
         // true time of this state (resampling interpolates to tEnd exactly anyway).
         if (Math.abs(f1) <= 1e-9 * (1 + tEnd)) yn[0] = tEnd;
+        // the secant's gbs() calls must not leave a fallback state computed from this step's start
+        bestErr = Infinity; bestY = null;
       }
       y = yn;
       chainBodies(y, c, m, R, V, pos, vel);
@@ -206,6 +210,10 @@ function physicsFactory(root) {
       c = rechain(y, c);
       if (st.k <= 4) H *= 1.5; else if (st.k >= 8) H *= 0.7;
       if (dtStep > maxDt) H *= maxDt / dtStep;
+      // likewise keep the next step inside the phase limit, rather than growing H past it and having
+      // the step rejected (a third of all steps on long orbits)
+      const next = dtStep * H / Hstep;
+      if (next > lim) H *= 0.9 * lim / next;
     }
     return { ts, ss, steps };
   }
@@ -220,7 +228,7 @@ function physicsFactory(root) {
     const out = new Float32Array(nSamples * 6);
     let seg = 0;
     for (let q = 0; q < nSamples; q++) {
-      const t = (q / (nSamples - 1)) * tEnd;
+      const t = nSamples > 1 ? (q / (nSamples - 1)) * tEnd : 0;
       while (seg < ts.length - 2 && ts[seg + 1] < t) seg++;
       const t0 = ts[seg], t1 = ts[Math.min(seg + 1, ts.length - 1)];
       const a = ss[seg], b = ss[Math.min(seg + 1, ss.length - 1)];

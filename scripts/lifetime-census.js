@@ -82,6 +82,7 @@ const loadWindow = (file, key) => {
       if (results.length % 50 === 0) console.log(`  ${results.length} / ${jobs.length}  (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
     });
     wk.on('error', rej);
+    wk.on('exit', (code) => { if (code !== 0) rej(new Error(`worker exited with code ${code}`)); });
   })));
   results.sort((a, b) => a.col - b.col || a.idx - b.idx);
   const errors = results.filter((r) => r.error), ok = results.filter((r) => !r.error);

@@ -8,9 +8,15 @@ function braidFactory(Physics) {
   // tight binary turns by only a small angle per step and no crossing is missed.
   function denseTrajectory(s0, m, tEnd, opts) {
     opts = opts || {};
-    return Physics.integrateAR(s0, m, tEnd, {
+    const tr = Physics.integrateAR(s0, m, tEnd, {
       tol: opts.tol || 1e-12, maxDt: opts.maxDt || tEnd / 3000, maxPhase: opts.maxPhase || 0.08,
+      maxSteps: opts.maxSteps || 1000000,
     });
+    // a truncated trajectory gives a partial braid that still looks self-consistent: refuse it
+    if (!opts.allowShort && tr.ts[tr.ts.length - 1] < tEnd * (1 - 1e-9)) {
+      throw new Error(`integration stopped at t = ${tr.ts[tr.ts.length - 1].toPrecision(6)} of ${tEnd.toPrecision(6)} (${tr.steps} steps)`);
+    }
+    return tr;
   }
 
   // Cubic Hermite position of all bodies inside step k at u in [0, 1] -> out[6]
@@ -29,10 +35,10 @@ function braidFactory(Physics) {
     const steps = 64, out = { ts: tr.ts.slice(), ss: tr.ss.slice() };
     const vel = new Float64Array(6);
     for (let i = 0; i < 6; i++) vel[i] = first[i] - last[i]; // displacement per unit pseudo-time
-    for (let j = 0; j <= steps; j++) {
+    // the last real state keeps its own velocity; the closure starts one sub-step later
+    for (let j = 1; j <= steps; j++) {
       const f = j / steps, s = new Float64Array(12);
       for (let i = 0; i < 6; i++) { s[i] = last[i] + f * vel[i]; s[6 + i] = vel[i]; }
-      if (j === 0) { out.ss[out.ss.length - 1] = s; continue; }
       out.ts.push(t0 + f); out.ss.push(s);
     }
     return out;
@@ -227,7 +233,8 @@ function braidFactory(Physics) {
       // the shifted window (δ, T + δ] on a trajectory extended slightly past T.
       const delta = 1e-3 * T, last = tr.ss[tr.ss.length - 1];
       const ext = denseTrajectory(last, m, 2 * delta, opts);
-      const full = { ts: tr.ts.concat(ext.ts.slice(1).map((t) => t + T)), ss: tr.ss.concat(ext.ss.slice(1)) };
+      const tLast = tr.ts[tr.ts.length - 1]; // T, or a hair past it if the landing did not snap exactly
+      const full = { ts: tr.ts.concat(ext.ts.slice(1).map((t) => t + tLast)), ss: tr.ss.concat(ext.ss.slice(1)) };
       syz = syzygies(full).filter((z) => z.t > delta && z.t <= T + delta);
     }
     if (kind === 'freefall') tr = closeLinearly(tr);

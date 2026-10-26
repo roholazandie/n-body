@@ -116,6 +116,7 @@ function parseLiaoWords(md) {
   const results = (await Promise.all(chunks.map((c) => new Promise((res, rej) => {
     const wk = new Worker(__filename, { workerData: { jobs: c } });
     wk.on('message', res); wk.on('error', rej);
+    wk.on('exit', (code) => rej(new Error(`worker exited with code ${code} before reporting`))); // no-op once settled
   })))).flat();
   results.sort((a, b) => a.col - b.col || a.idx - b.idx);
 

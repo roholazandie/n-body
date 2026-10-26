@@ -30,7 +30,7 @@ async function buildFreeFall() {
     const isSd = selfDualTs.some((t) => Math.abs(t - Ts) < 1e-9 * Ts) ? 1 : 0;
     return [x.toPrecision(17), y.toPrecision(17), T.toPrecision(17), Ts.toPrecision(12), lyap[i].toPrecision(5), solId, isSd]
       .map(String)
-      .map((s) => s.replace(/e\+?/, 'e').replace(/^0\./, '.').replace(/(\.\d*?)0+(e|$)/, '$1$2'))
+      .map((s) => s.replace(/e\+?/, 'e').replace(/^0\./, '.').replace(/(\.\d*?)0+(e|$)/, '$1$2').replace(/^\.$/, '0')) // 0 must not become '.'
       .join(',');
   });
   fs.writeFileSync(path.join(APP, 'orbits-data.js'),

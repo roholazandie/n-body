@@ -55,7 +55,8 @@ function cloudsFactory(Physics) {
       const na = (1 + k) * a + c, nb = (1 + k) * b + d, nc = k * a + c, nd = k * b + d;
       a = na; b = nb; c = nc; d = nd;
       const m = Math.max(Math.abs(a), Math.abs(b), Math.abs(c), Math.abs(d));
-      if (m > 1e100) { a /= m; b /= m; c /= m; d /= m; logScale += Math.log(m); }
+      // rescale long before squares and products of entries could overflow (|entry|² ≤ 1e60)
+      if (m > 1e30) { a /= m; b /= m; c /= m; d /= m; logScale += Math.log(m); }
       // largest singular value of [[a, b], [c, d]]
       const s1 = a * a + b * b + c * c + d * d, det = a * d - b * c;
       const sig = Math.sqrt((s1 + Math.sqrt(Math.max(0, s1 * s1 - 4 * det * det))) / 2);
@@ -171,7 +172,7 @@ function cloudsFactory(Physics) {
   // nearest-neighbour chain algorithm, O(N²). Returns merges [{a, b, h}] sorted by height, where a and b
   // are cluster ids (0…N−1 leaves, N + k the k-th merge).
   function completeLinkage(D, N) {
-    const active = new Uint8Array(N).fill(1), raw = [], chain = [];
+    const active = new Uint8Array(N).fill(1), raw = [], chain = [], deferred = [];
     let left = N;
     while (left > 1) {
       if (!chain.length) { for (let i = 0; i < N; i++) if (active[i]) { chain.push(i); break; } }
@@ -182,6 +183,9 @@ function cloudsFactory(Physics) {
         const d = D[a * N + j];
         if (d < best || (d === best && j === prev)) { best = d; b = j; }
       }
+      // a cluster with no finite distance left (a member lost to a collision or escape) joins the rest only
+      // at infinite height, i.e. after every finite merge: set it aside and attach it at the end
+      if (b < 0) { active[a] = 0; left--; chain.pop(); deferred.push(a); continue; }
       if (b === prev) {
         // reciprocal nearest neighbours: merge slot a into slot b (Lance–Williams, complete linkage)
         chain.pop(); chain.pop();
@@ -194,6 +198,10 @@ function cloudsFactory(Physics) {
         active[a] = 0; left--;
       } else chain.push(b);
     }
+    let root = -1;
+    for (let i = 0; i < N; i++) if (active[i]) root = i;
+    if (root < 0) root = deferred.pop();
+    for (const d of deferred) raw.push({ i: d, j: root, h: Infinity });
     // The chain finds merges out of height order; complete linkage has no inversions, so replaying
     // them sorted by height (union–find on one leaf per slot) gives the dendrogram with cluster ids
     // 0…N−1 for leaves and N + k for the k-th merge.

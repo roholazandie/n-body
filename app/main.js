@@ -3,11 +3,18 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
-  const canvas = $('stage');
+  let canvas = $('stage');
   const overlay = $('overlay');
   const octx = overlay.getContext('2d');
   let GL = null;
-  try { GL = createGLPainter(canvas); } catch (e) { console.warn('WebGL unavailable, using Canvas 2D', e); }
+  try { GL = createGLPainter(canvas); } catch (e) {
+    console.warn('WebGL unavailable, using Canvas 2D', e);
+    // a canvas that already holds a (broken) WebGL context cannot give a 2D one: swap in a fresh element
+    const fresh = canvas.cloneNode(false); canvas.replaceWith(fresh); canvas = fresh;
+  }
+  // after a GPU reset the WebGL state is gone; the simplest correct recovery is a reload
+  canvas.addEventListener('webglcontextlost', (e) => e.preventDefault());
+  canvas.addEventListener('webglcontextrestored', () => location.reload());
   const ctx = GL ? null : canvas.getContext('2d');
   const PERMS = [[0, 1, 2], [1, 2, 0], [2, 0, 1], [0, 2, 1], [2, 1, 0], [1, 0, 2]];
   const PALETTES = {
@@ -26,7 +33,7 @@
     trail: 0.4, width: 1.2, glow: 1, body: 1, ghost: false,
     ffSort: 'tstar', ffSelfDual: false, ffDistinct: true, ffTmin: 0, ffTmax: 80, page: 0,
     llMass: 'all', llClass: 'all', llSort: 'tstar',
-    view: 'orbits', braidSpan: 8, braidAngle: 0, braidSpin: false, braidGap: 1,
+    view: 'orbits', braidSpan: 8, braidAngle: 0, braidSpin: false, braidGap: 1, shuffleSeed: 1,
   };
   let S = Object.assign({}, DEFAULTS);
   try { Object.assign(S, JSON.parse(localStorage.getItem('threebody.settings') || '{}')); } catch (e) { /* storage unavailable */ }
@@ -55,7 +62,6 @@
   }
 
   let ffList = [];
-  let shuffleSeed = 1;
   function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
   function buildFFList() {
     const D = ffData();
@@ -70,7 +76,7 @@
     if (S.ffSort === 'lyap') list.sort((a, b) => D.lyap[a] - D.lyap[b]);
     else if (S.ffSort === 'lyapDesc') list.sort((a, b) => D.lyap[b] - D.lyap[a]);
     else if (S.ffSort === 'random') {
-      const r = rng(shuffleSeed);
+      const r = rng(S.shuffleSeed);
       for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
     }
     ffList = list;
@@ -101,7 +107,7 @@
     if (S.llSort === 'tstar') list.sort((a, b) => D[a].Ts - D[b].Ts);
     else if (S.llSort === 'lf') list.sort((a, b) => D[a].Lf - D[b].Lf || D[a].Ts - D[b].Ts);
     else if (S.llSort === 'random') {
-      const r = rng(shuffleSeed);
+      const r = rng(S.shuffleSeed);
       for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
     }
     llList = list;
@@ -196,7 +202,12 @@
   }
   // Compute pending orbits a few per frame so the UI never stalls.
   const queue = [];
-  function enqueue(item) { if (!cache.has(item.key) && !queue.some((q) => q.key === item.key)) queue.push(item); }
+  function enqueue(item, first) {
+    if (cache.has(item.key)) return;
+    const i = queue.findIndex((q) => q.key === item.key);
+    if (i >= 0) { if (!first) return; queue.splice(i, 1); }
+    if (first) queue.unshift(item); else queue.push(item);
+  }
   function pump(budgetMs) {
     const t0 = performance.now();
     while (queue.length && performance.now() - t0 < budgetMs) {
@@ -206,7 +217,7 @@
     }
     if (cache.size > 400) { // simple eviction: drop oldest entries not on screen
       const keep = new Set(cells.map((c) => c.item.key));
-      if (focus) keep.add(focus.item.key);
+      if (focus) { keep.add(focus.item.key); keep.add(focus.base.key); }
       for (const k of cache.keys()) { if (cache.size <= 300) break; if (!keep.has(k)) cache.delete(k); }
     }
   }
@@ -237,6 +248,11 @@
     const r = rng(start * 7 + 3);
     cells = items.map((item, k) => ({ item, phaseOffset: r(), repeat: k >= unique,
       perm: PERMS[(k * 5 + 2 + start + Math.floor(k / Math.max(1, unique))) % 6] }));
+    // drop queued work for pages no longer shown (rapid paging would otherwise make the visible page
+    // and the inspector wait behind hundreds of off-screen orbits)
+    const wanted = new Set(cells.map((c) => c.item.key));
+    if (focus) { wanted.add(focus.item.key); wanted.add(focus.base.key); }
+    for (let i = queue.length - 1; i >= 0; i--) if (!wanted.has(queue[i].key)) queue.splice(i, 1);
     cells.forEach((c) => enqueue(c.item));
     updatePager();
   }
@@ -657,7 +673,7 @@
     const sync = () => el.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === S[key]));
     el.addEventListener('click', (e) => {
       const b = e.target.closest('button'); if (!b) return;
-      S[key] = b.dataset.v; sync(); save(); cb && cb();
+      S[key] = b.dataset.v; sync(); cb && cb(); save();
     });
     sync();
   }
@@ -670,7 +686,7 @@
   }
   function check(id, key, cb) {
     const el = $(id); el.checked = !!S[key];
-    el.addEventListener('change', () => { S[key] = el.checked; save(); cb && cb(); });
+    el.addEventListener('change', () => { S[key] = el.checked; cb && cb(); save(); });
   }
   function num(id, key, cb) {
     const el = $(id); el.value = S[key];
@@ -681,13 +697,13 @@
     el.addEventListener('input', () => {
       const v = parse();
       if (!isFinite(v) || v < lo || v > hi || v === S[key]) return;
-      S[key] = v; save(); cb && cb();
+      S[key] = v; cb && cb(); save();
     });
     el.addEventListener('change', () => {
       const v = parse();
       const c = isFinite(v) ? Math.max(lo, Math.min(hi, v)) : S[key];
       el.value = c;
-      if (c !== S[key]) { S[key] = c; save(); cb && cb(); }
+      if (c !== S[key]) { S[key] = c; cb && cb(); save(); }
     });
   }
 
@@ -720,6 +736,10 @@
       $('braidOpts').hidden = S.view !== 'braid';
       $('lab').hidden = S.view !== 'lab';
       $('clouds').hidden = S.view !== 'clouds';
+      if (S.view === 'lab' || S.view === 'clouds') {
+        $('braidZoom').hidden = true; // frame() no longer runs placeZoomControl in these views
+        if (activeRecorder) { activeRecorder.stop(); toast('Recording stopped: the lab and clouds views are not recorded'); }
+      }
       if (S.view === 'lab') { closeFocus(); layoutLab(); window.BraidLab.show(); }
       else if (S.view === 'clouds') { closeFocus(); layoutLab(); window.CloudView.show(); }
       else lastView = S.view;
@@ -742,7 +762,7 @@
     seg('collectionSeg', 'collection', onCollection);
     seg('timingSeg', 'timing');
     $('ffSort').value = S.ffSort;
-    $('ffSort').addEventListener('change', () => { S.ffSort = $('ffSort').value; shuffleSeed = (Math.random() * 1e9) | 0; save(); onFFChange(); });
+    $('ffSort').addEventListener('change', () => { S.ffSort = $('ffSort').value; S.shuffleSeed = (Math.random() * 1e9) | 0; onFFChange(); save(); });
     check('ffSelfDual', 'ffSelfDual', onFFChange);
     check('ffDistinct', 'ffDistinct', onFFChange);
     num('ffTmin', 'ffTmin', onFFChange);
@@ -782,7 +802,7 @@
     syncCollectionOpts();
     for (const k of ['llMass', 'llClass', 'llSort']) {
       $(k).value = S[k];
-      $(k).addEventListener('change', () => { S[k] = $(k).value; if (k === 'llSort') shuffleSeed = (Math.random() * 1e9) | 0; save(); onLLChange(); });
+      $(k).addEventListener('change', () => { S[k] = $(k).value; if (k === 'llSort') S.shuffleSeed = (Math.random() * 1e9) | 0; onLLChange(); save(); });
     }
 
     canvas.addEventListener('mousemove', (e) => { hoverIdx = focus ? -1 : hitCell(e.clientX, e.clientY); });
@@ -794,8 +814,9 @@
     });
     window.addEventListener('keydown', (e) => {
       if (e.target.matches('input, select, textarea')) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return; // leave browser shortcuts (copy, zoom, save…) alone
       if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
-      else if (e.key === 's' || e.key === 'S') $('panel').classList.toggle('open');
+      else if (e.key === 's' || e.key === 'S') { $('panel').classList.toggle('open'); layoutLab(); }
       else if (e.key === 'l' || e.key === 'L') document.querySelector(`#viewSeg [data-v=${S.view === 'lab' ? lastView : 'lab'}]`).click();
       else if (e.key === 'c' || e.key === 'C') document.querySelector(`#viewSeg [data-v=${S.view === 'clouds' ? lastView : 'clouds'}]`).click();
       else if (e.key === 'b' || e.key === 'B') document.querySelector(`#viewSeg [data-v=${S.view === 'braid' ? 'orbits' : 'braid'}]`).click();
@@ -826,7 +847,7 @@
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     });
   }
-  let recording = false;
+  let recording = false, activeRecorder = null;
   function recordLoop() {
     if (recording) return;
     if (!canvas.captureStream || typeof MediaRecorder === 'undefined') { toast('Recording is not supported in this browser'); return; }
@@ -837,13 +858,16 @@
     recordCanvas.width = canvas.width; recordCanvas.height = canvas.height;
     const stream = recordCanvas.captureStream(60);
     const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12e6 });
+    activeRecorder = rec;
     const chunks = [];
     rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
     rec.onstop = () => {
-      recording = false; recordCanvas = null; $('recBtn').textContent = 'Record loop';
+      recording = false; recordCanvas = null; activeRecorder = null; $('recBtn').textContent = 'Record loop';
+      stream.getTracks().forEach((t) => t.stop());
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob(chunks, { type: mime }));
       a.download = 'three-body.' + (mime.includes('mp4') ? 'mp4' : 'webm'); a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
     };
     // one full loop of the longest-period cell on screen
     const cs = focus ? [focus] : cells;
@@ -853,7 +877,7 @@
     clock = 0; playing = true; $('playBtn').textContent = 'Pause';
     recording = true; $('recBtn').textContent = `Recording ${secs.toFixed(0)} s…`;
     rec.start();
-    setTimeout(() => rec.stop(), secs * 1000);
+    setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, secs * 1000);
   }
 
   // ---------- inspector ----------
@@ -861,7 +885,7 @@
 
   function openFocus(cell) {
     focus = { item: cell.item, phaseOffset: cell.phaseOffset, perm: cell.perm, base: cell.item };
-    enqueue(focus.item);
+    enqueue(focus.item, true);
     $('inspector').hidden = false;
     fillInspector();
   }
@@ -869,7 +893,7 @@
     if (!focus) focus = { phaseOffset: 0, perm: PERMS[0] };
     focus.item = item;
     if (!keepBase) focus.base = item;
-    enqueue(item);
+    enqueue(item, true);
     clock = 0;
     $('inspector').hidden = false;
     fillInspector();
@@ -924,14 +948,15 @@
     $('stabSec').hidden = base.kind === 'custom' && !base.periodic;
     fillICTable(s, m);
     drawDomain();
-    if (!o) setTimeout(() => focus && focus.item === item && fillInspector(), 120);
+    // wait for the orbit without rebuilding the inspector (which would wipe the initial-conditions editor)
+    if (!o) { const poll = () => { if (!focus || focus.item !== item) return; if (getOrbit(item)) fillInspector(); else setTimeout(poll, 120); }; setTimeout(poll, 120); }
     fillBraid(item, o);
     fillLife(item, o);
   }
 
   function fillICTable(s, m) {
     const tb = $('icBody');
-    const sw = (k) => `<span class="swatch" style="background:${currentColors().c[(focus.perm || PERMS[0])[k]]}"></span>`;
+    const sw = (k) => `<span class="swatch" style="background:${currentColors().c[(S.shuffleColors && focus.perm ? focus.perm : PERMS[0])[k]]}"></span>`;
     let h = '';
     for (let b = 0; b < 3; b++) {
       h += `<tr><td>${sw(b)}</td>` + [m[b], s[2 * b], s[2 * b + 1], s[6 + 2 * b], s[7 + 2 * b]]
@@ -1126,7 +1151,7 @@
   // ---------- form lifetime of the focused orbit ----------
   const lifeCache = new Map();
   const LIFE_COLORS = ['#3987e5', '#d95926', '#199e70']; // collection colours, as in the lab
-  let lifeJob = 0;
+  let lifeJob = 0, lifeRunning = null; // key of the orbit whose live run is in progress
   function orbitPeriod(item, o) {
     return item.kind === 'classic' ? (o && o.T) || CLASSICS[item.idx].T : item.kind === 'll' ? llData()[item.idx].T : ffData().T[item.idx];
   }
@@ -1135,7 +1160,7 @@
     return {
       source: 'census', lambdaP: c.lambdaP, lambdaRef: c.lambdaCat, maxPeriods: M.maxPeriods, nSyz: c.nSyz,
       rmin: 10 ** c.rmin, base: { tau: c.base, censored: c.baseCensored }, epsCat: 10 ** c.epsCat, closure0: 10 ** c.closure0, closure: 10 ** c.closure,
-      points: c.taus.map((tau, k) => ({ eps: 10 ** M.eps[k], tau, censored: tau >= M.maxPeriods })),
+      points: c.taus.map((tau, k) => ({ eps: 10 ** M.eps[k], tau, censored: tau >= M.maxPeriods })), // all directions survived
       fit: Number.isFinite(c.lambdaFit) ? { lambda: c.lambdaFit, slope: 1 / c.lambdaFit, eps0: 10 ** c.eps0, delta: 10 ** c.delta, r2: c.r2 } : null,
     };
   }
@@ -1148,6 +1173,7 @@
       const c = window.BraidLab.lifeLookup(ref.col, ref.idx);
       if (c) res = lifeFromCensus(c, window.LIFETIME_META);
     }
+    if (lifeRunning === item.key) return; // a live run for this orbit is in progress: keep its button and progress
     $('lifeRun').disabled = false;
     $('lifeRun').textContent = res ? 'Re-run live' : 'Run experiment';
     $('lifeMsg').textContent = res ? (res.source === 'census' ? 'From the lifetime census (scripts/lifetime-census.js).' : 'Computed live in this browser.')
@@ -1157,6 +1183,7 @@
   }
   async function runLife(item, o, col) {
     const job = ++lifeJob;
+    lifeRunning = item.key;
     const { s, m } = itemState(item);
     const btn = $('lifeRun'), msg = $('lifeMsg');
     btn.disabled = true;
@@ -1164,7 +1191,7 @@
     const tick = async (f, phase) => {
       if (job !== lifeJob || !focus || focus.item !== item) throw new Error('cancelled');
       if (performance.now() - last > 40) {
-        msg.textContent = `${phase === 'monodromy' ? 'Monodromy matrix' : 'Perturbed runs'} … ${Math.round(100 * f)}%`;
+        msg.textContent = `${{ refining: 'Refining the orbit (Newton)', monodromy: 'Monodromy matrix' }[phase] || 'Perturbed runs'} … ${Math.round(100 * f)}%`;
         await new Promise((r) => setTimeout(r, 0));
         last = performance.now();
       }
@@ -1174,9 +1201,12 @@
         { tick, lambdaRef: item.kind === 'ff' ? ffData().lyap[item.idx] : undefined });
       r.source = 'live';
       lifeCache.set(item.key, r);
+      lifeRunning = null;
       if (focus && focus.item === item) fillLife(item, o);
     } catch (e) {
-      if (e.message !== 'cancelled') { msg.textContent = 'Experiment failed: ' + e.message; btn.disabled = false; }
+      if (e.message !== 'cancelled' && job === lifeJob && focus && focus.item === item) { msg.textContent = 'Experiment failed: ' + e.message; btn.disabled = false; }
+    } finally {
+      if (job === lifeJob) lifeRunning = null;
     }
   }
   function renderLife(col, res) {
@@ -1241,7 +1271,8 @@
         g.beginPath(); g.moveTo(sx(p.x), sy(p.min)); g.lineTo(sx(p.x), sy(p.max)); g.stroke(); g.globalAlpha = 1;
       }
       g.beginPath(); g.arc(sx(p.x), sy(p.tau), 3.2, 0, 7);
-      if (p.censored) { g.strokeStyle = color; g.lineWidth = 1.3; g.stroke(); } else { g.fillStyle = color; g.fill(); }
+      // hollow when every direction survived the window (the census stores only means, so live runs use the same rule)
+      if (p.tau >= res.maxPeriods) { g.strokeStyle = color; g.lineWidth = 1.3; g.stroke(); } else { g.fillStyle = color; g.fill(); }
     }
     const rows = [];
     const lp = res.lambdaP;
@@ -1284,6 +1315,6 @@
   if (S.collection === 'freefall') buildFFList();
   if (S.collection === 'liao') buildLLList();
   buildCells();
-  window.addEventListener('resize', () => { resize(); domBase = null; if (focus) drawDomain(); });
+  window.addEventListener('resize', () => { resize(); domBase = null; if (focus) drawDomain(); layoutLab(); });
   requestAnimationFrame(frame);
 })();

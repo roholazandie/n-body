@@ -55,7 +55,9 @@
         st.unit = 1; st.unitName = 'iterations';
       } else {
         const o = ORBITS[st.orbit], sp = orbitSpec(o);
-        st.cloud = await C.threeBodyCloud(sp.s, sp.m, o.periods * sp.T, N, r0, 241, tick('Integrating members'));
+        const cloud = await C.threeBodyCloud(sp.s, sp.m, o.periods * sp.T, N, r0, 241, tick('Integrating members'));
+        if (job !== st.job) return; // superseded while integrating
+        st.cloud = cloud;
         // dense one-period path of the orbit for the background, centre-of-mass frame
         const res = P.integrateAR(sp.s, sp.m, o.kind === 'ff' ? sp.T / 2 : sp.T, { tol: 1e-12, maxDt: sp.T / 1500 });
         const Mm = sp.m[0] + sp.m[1] + sp.m[2];
@@ -66,10 +68,13 @@
         st.bounds = null;
         st.lam = o.lam / sp.T; st.unit = sp.T; st.unitName = 'periods';
         $('clMsg').textContent = 'Stretching of the centre …'; await new Promise((r) => setTimeout(r, 0));
-        st.lnL = C.runningMax(C.tbStretch(sp.s, sp.m, o.periods * sp.T, 241));
+        const lnL = C.runningMax(C.tbStretch(sp.s, sp.m, o.periods * sp.T, 241));
+        if (job !== st.job) return;
+        st.lnL = lnL;
       }
-      st.hist = await C.history(st.cloud, tick('Clustering'));
+      const hist = await C.history(st.cloud, tick('Clustering'));
       if (job !== st.job) return;
+      st.hist = hist; st.k = 0; st.cache = {};
       $('clMsg').textContent = '';
       $('clT').max = st.cloud.frames.length - 1; $('clT').value = 0;
       st.playing = true; $('clPlay').textContent = '❚❚';
@@ -248,9 +253,9 @@
   }
 
   // ---------- playback ----------
-  let lastT = 0, acc = 0;
-  function loop(now) {
-    if (!st.visible) return;
+  let lastT = 0, acc = 0, loopId = 0;
+  function loop(now, id) {
+    if (!st.visible || id !== loopId) return; // hidden, or superseded by a newer loop
     const dt = Math.min(0.1, (now - lastT) / 1000 || 0); lastT = now;
     if (st.playing && st.hist) {
       acc += dt * 24; // frames per second
@@ -261,7 +266,7 @@
         $('clT').value = st.k; refreshObjects(); draw();
       }
     }
-    requestAnimationFrame(loop);
+    requestAnimationFrame((t) => loop(t, id));
   }
 
   function setSystem(s) {
@@ -283,7 +288,9 @@
     $('clR0').addEventListener('change', run);
     $('clOrbit').addEventListener('change', () => { st.orbit = +$('clOrbit').value; st.bounds = null; $('clR0').value = ORBITS[st.orbit].r0; run(); });
     $('clEps').addEventListener('input', () => { st.eps = +$('clEps').value; refreshObjects(); draw(); });
-    $('clT').addEventListener('input', () => { st.k = +$('clT').value; st.playing = false; $('clPlay').textContent = '▶'; refreshObjects(); draw(); });
+    $('clT').addEventListener('input', () => {
+      if (!st.hist) return; // nothing to scrub while a cloud is being computed
+      st.k = Math.min(+$('clT').value, st.cloud.frames.length - 1); st.playing = false; $('clPlay').textContent = '▶'; refreshObjects(); draw(); });
     $('clPlay').onclick = () => {
       if (!st.cloud) return;
       if (!st.playing && st.k === st.cloud.frames.length - 1) st.k = 0;
@@ -302,9 +309,12 @@
   let started = false;
   window.CloudView = {
     show() {
+      const wasVisible = st.visible;
       st.visible = true;
       if (!started) { started = true; init(); setSystem('std'); }
-      lastT = performance.now(); requestAnimationFrame(loop); draw();
+      // one playback loop only: it stops by itself once the view is hidden
+      if (!wasVisible) { const id = ++loopId; lastT = performance.now(); requestAnimationFrame((t) => loop(t, id)); }
+      draw();
     },
     hide() { st.visible = false; },
     draw,

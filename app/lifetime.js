@@ -7,7 +7,10 @@
 function lifetimeFactory(Physics, Braid) {
   'use strict';
   const TOL = 1e-13;
-  const dense = (s, m, t) => Braid.denseTrajectory(s, m, t, { tol: TOL, maxDt: t / 400 });
+  // short (truncated) runs are allowed here: formLifetime treats them as the end of the form
+  const dense = (s, m, t) => Braid.denseTrajectory(s, m, t, { tol: TOL, maxDt: t / 400, allowShort: true });
+  // the reference period itself must be complete
+  const denseFull = (s, m, t) => Braid.denseTrajectory(s, m, t, { tol: TOL, maxDt: t / 400 });
   const lastState = (tr) => tr.ss[tr.ss.length - 1];
   const reached = (tr, t) => tr.ts[tr.ts.length - 1] >= t * (1 - 1e-9);
 
@@ -18,15 +21,16 @@ function lifetimeFactory(Physics, Braid) {
   // other way); 'closed': shift the window by δ = 10⁻³T because many orbits start collinear.
   function reference(s0, m, T, kind) {
     if (kind === 'freefall') {
-      const tr = dense(s0, m, T / 2);
+      const tr = denseFull(s0, m, T / 2);
       const half = Braid.syzygies(tr);
       const back = half.slice().reverse().map((z) => ({ t: T - z.t, mid: z.mid, dir: -z.dir }));
       return { syz: half.concat(back), T, t0: 0, tr, kind };
     }
     const delta = 1e-3 * T;
-    const tr = dense(s0, m, T);
-    const ext = dense(lastState(tr), m, 2 * delta);
-    const full = { ts: tr.ts.concat(ext.ts.slice(1).map((t) => t + T)), ss: tr.ss.concat(ext.ss.slice(1)) };
+    const tr = denseFull(s0, m, T);
+    const ext = denseFull(lastState(tr), m, 2 * delta);
+    const tLast = tr.ts[tr.ts.length - 1];
+    const full = { ts: tr.ts.concat(ext.ts.slice(1).map((t) => t + tLast)), ss: tr.ss.concat(ext.ss.slice(1)) };
     const syz = Braid.syzygies(full).filter((z) => z.t > delta && z.t <= T + delta);
     return { syz, T, t0: delta, tr, kind };
   }
@@ -294,8 +298,11 @@ function lifetimeFactory(Physics, Braid) {
         censored: censored * 2 > dirs });
     }
     const f = fit(points);
-    // invert the fitted law at the published i.c.'s own lifetime: its effective distance from the orbit
-    const epsCat = f && !base.censored ? f.delta * Math.exp(-f.lambda * base.tau) : NaN;
+    // invert the fitted law τ = ln(δ/(ε + ε₀))/λ at the published i.c.'s own lifetime: its effective distance
+    // from the refined orbit. Undefined when the lifetime is at the floor, and for free-fall orbits, whose
+    // published i.c. is itself the reference (its finite lifetime there is round-off, not catalogue error).
+    const eCat = f && !base.censored && refined ? f.delta * Math.exp(-f.lambda * base.tau) - f.eps0 : NaN;
+    const epsCat = eCat > 0 ? eCat : NaN;
     return { points, fit: f, lambdaP, lambdaRef: opts.lambdaRef, base, nSyz: ref.syz.length, maxPeriods,
       epsCat, rmin: closestApproach(s0, m, T, kind), closure0: refined ? refined.closure0 : NaN, closure: refined ? refined.closure : NaN, T: Tref };
   }
