@@ -21,6 +21,11 @@ function check(name, fn) {
   try { const msg = fn(); console.log(`✓ ${name}  ${msg || ''}  (${Date.now() - t0} ms)`); }
   catch (e) { failures++; console.log(`✗ ${name}\n  ${e.message}`); }
 }
+async function checkAsync(name, fn) {
+  const t0 = Date.now();
+  try { const msg = await fn(); console.log(`✓ ${name}  ${msg || ''}  (${Date.now() - t0} ms)`); }
+  catch (e) { failures++; console.log(`✗ ${name}\n  ${e.message}`); }
+}
 
 check('free-fall orbits come to rest at T/2 (every 50th i.c.)', () => {
   const rows = loadData('orbits-data.js', 'ORBIT_DATA');
@@ -119,5 +124,44 @@ check('braid trace equals the free-group-word trace via Γ(2) (every 25th Li & L
   return `${n} orbits`;
 });
 
-if (failures) { console.log(`\n${failures} check(s) failed`); process.exit(1); }
-console.log('\nall checks passed');
+(async () => {
+  const Lifetime = require(path.join(APP, 'lifetime.js'));
+  await checkAsync('monodromy exponent matches the published free-fall Lyapunov exponents (every 1000th i.c.)', async () => {
+    const rows = loadData('orbits-data.js', 'ORBIT_DATA');
+    const out = [];
+    for (let i = 0; i < rows.length; i += 1000) {
+      const [x, y, T, , lyap] = rows[i].map(Number);
+      const s = Physics.freeFallState(x, y);
+      if (Lifetime.closestApproach(s, [1, 1, 1], T, 'freefall') < Lifetime.RMIN_RELIABLE) continue; // λ_p flagged unreliable
+      const lp = await Lifetime.lyapunov(Lifetime.reference(s, [1, 1, 1], T, 'freefall'), [1, 1, 1]);
+      assert(Math.abs(lp - lyap) < 0.01 * lyap, `i.c. ${i}: λ_p = ${lp}, published ${lyap}`);
+      out.push(lp);
+    }
+    return `${out.length} orbits`;
+  });
+  await checkAsync('Newton refinement removes the spurious instability of Broucke A1 (published i.c. closes to 10⁻²)', async () => {
+    const c = CLASSICS.find((x) => x.name === 'Broucke A1');
+    const r = await Lifetime.refine(c.s, [1, 1, 1], closedT(c));
+    assert(r.closure < 1e-10, `closure ${r.closure}`);
+    const lp = Lifetime.lambdaOf(r.M);
+    assert(lp < 0.05, `λ_p = ${lp} on the refined orbit`);
+    // a sheared, linearly stable Li & Liao orbit (m₃ = 0.5): finite-difference error must not split its unit eigenvalues
+    const [, m3, v1, v2, T] = loadData('liao-data.js', 'LIAO_DATA')[728].map(Number);
+    const q = await Lifetime.refine([-1, 0, 1, 0, 0, 0, v1, v2, v1, v2, -2 * v1 / m3, -2 * v2 / m3], [1, 1, m3], T);
+    assert(Lifetime.lambdaOf(q.M) < 0.05, `I.A 34 (m₃ = 0.5): λ_p = ${Lifetime.lambdaOf(q.M)}`);
+    return `closure ${r.closure0.toExponential(1)} → ${r.closure.toExponential(1)}, λ_p = ${lp.toFixed(3)}`;
+  });
+  await checkAsync('form lifetime follows ln(1/ε)/λ_p (Li & Liao I.A 6, m₃ = 0.5); figure-eight is stable', async () => {
+    const [, m3, v1, v2, T] = loadData('liao-data.js', 'LIAO_DATA')[700].map(Number);
+    const s = [-1, 0, 1, 0, 0, 0, v1, v2, v1, v2, -2 * v1 / m3, -2 * v2 / m3];
+    const r = await Lifetime.experiment(s, [1, 1, m3], T, 'closed', { dirs: 4 });
+    assert(Math.abs(r.fit.lambda / r.lambdaP - 1) < 0.1, `λ_fit ${r.fit.lambda} vs λ_p ${r.lambdaP}`);
+    assert(r.closure < 1e-9 && r.closure < r.closure0, `Newton refinement: closure ${r.closure0} -> ${r.closure}`);
+    const f8 = CLASSICS[0];
+    const q = await Lifetime.experiment(f8.s, [1, 1, 1], closedT(f8), 'closed', { dirs: 2, eps: [1e-3, 1e-6], maxPeriods: 20, skipMonodromy: true });
+    assert(q.points.every((p) => p.censored), 'figure-eight should keep its form');
+    return `λ_fit/λ_p = ${(r.fit.lambda / r.lambdaP).toFixed(3)}`;
+  });
+  if (failures) { console.log(`\n${failures} check(s) failed`); process.exit(1); }
+  console.log('\nall checks passed');
+})();

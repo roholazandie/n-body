@@ -49,6 +49,8 @@ syzygy sequences (2{,}043 of 2{,}044 and 236 of 236; the one difference is an er
 The census shows four things. The figure-eight realises the golden braid $(\sigma_1\sigma_2^{-1})^3$. Within each
 mass ratio, braid entropy grows linearly with the scale-invariant period. Braid entropy is uncorrelated with the
 orbit's Lyapunov exponent. Hierarchical orbits are exactly the reducible braids.
+A second census of 794 orbits confirms the lifetime law: measured lifetimes give exponents within a median of
+$0.5\%$ of the monodromy exponent for unstable classic and Li--Liao orbits.
 The symbolic $n$-cylinders of the dynamics carry a genealogical probability structure (a filtration,
 conditional measures that are exact mixtures of their descendants, a martingale of refining predictions and
 a scale decomposition of Kullback--Leibler divergence), and the tree is \emph{grown} by time rather than
@@ -493,6 +495,89 @@ Lifetime grows only logarithmically with precision. With $\lambda_p\approx15$ pe
 and $\delta\approx0.1$, \eqref{eq:lifetime} gives $\tau\approx0.8$ periods, consistent with numerical
 observation (iv) of Section~\ref{sec:instrument}.
 
+\subsection{Measured lifetimes}
+\label{sec:lifetimes}
+
+We tested \eqref{eq:lifetime} on 794 catalogued orbits: all 20 classics, every eighth Li--Liao orbit and every
+24th distinct free-fall solution (\texttt{scripts/lifetime-census.js}). The form of an orbit is its periodic
+syzygy sequence. Each orbit is displaced by $\varepsilon=10^{-3},10^{-3.5},\dots,10^{-13}$ in eight random
+phase-space directions with the centre-of-mass motion removed. It is then integrated for up to 40 periods, and
+$\tau$ is the time of the first syzygy that differs from the periodic sequence. A fit of
+$\tau=\ln\!\bigl(\delta/(\varepsilon+\varepsilon_0)\bigr)/\lambda_{\text{fit}}$ to the mean lifetimes gives a
+\emph{measured} exponent $\lambda_{\text{fit}}$; the small floor $\varepsilon_0$ absorbs numerical error. The
+prediction $\lambda_p=\ln\max|\mu|$ is computed independently, from the one-period monodromy matrix, as a product
+of finite-difference Jacobians along the orbit.
+
+\paragraph{Getting $\lambda_p$ right.} Three numerical traps had to be removed before the comparison meant
+anything.
+\begin{enumerate}[leftmargin=*]
+\item \emph{Inexact initial conditions.} Published initial conditions close only to $10^{-2}$ (the classics,
+  given to about six digits) down to $10^{-8}$. For a linearly stable orbit with strong shear (a fast inner
+  binary, or a long period) the monodromy has a large Jordan-like block at eigenvalue $1$. An error of that size
+  splits the block into a spurious real pair $\mu,1/\mu$. Broucke~A1 then appears to have $\lambda_p=1.6$
+  although nearby trajectories separate only linearly in time. We therefore refine every closed orbit by Newton
+  shooting on $(x_0,T)$, taking minimum-norm least-squares steps because the symmetries make the system
+  singular. The median closure drops from $6\times10^{-8}$ to $3\times10^{-10}$ (classics: $10^{-2}\to10^{-12}$),
+  and the spurious instabilities of Broucke~A1, Bumblebee and Yin--yang~II disappear.
+\item \emph{Restarting inside an encounter.} Splitting the period at uniform times can restart the integrator in
+  the middle of a close encounter, where kinetic and potential energy are huge and nearly cancel; the finite
+  differences amplify the lost precision. We cut the period only where the three bodies are well separated, and
+  keep the growth across each piece below 100. For free-fall orbits we integrate only the first half. The second
+  half is its time reverse, so $M=RJ_1^{-1}RJ_1$ with $R=\mathrm{diag}(1,-1)$ on positions and velocities, and
+  symplecticity gives $J_1^{-1}=-\Omega J_1^{\mathsf T}\Omega$ without an ill-conditioned inversion.
+\item \emph{Near-collisions.} Finite differences of size $10^{-6}$ cannot resolve an encounter closer than about
+  $10^{-7}$. Of the 518 free-fall orbits, 165 pass that close to a binary collision; we flag them and leave them
+  out of the statistics.
+\end{enumerate}
+\noindent With these measures, $\lambda_p$ agrees with the Lyapunov exponents published by Hristov et al.\
+\cite{Hristov2024} to within $1\%$ for all 353 remaining free-fall orbits (median deviation $10^{-5}$).
+
+\paragraph{Result.} The law holds over four decades of $\lambda_p$ (Fig.~\ref{fig:lifetimes}).
+Table~\ref{tab:lifetimes} gives the agreement for the unstable orbits ($\lambda_p\ge0.05$). Butterfly~I is an
+example: $\lambda_p=0.574$, $\lambda_{\text{fit}}=0.572$, and the fit has $R^2=0.99998$ over seven decades of
+$\varepsilon$. The deviations are where the method predicts them to be. Weakly unstable Li--Liao orbits
+($\lambda_p\approx0.05$--$0.15$) live longer than the 40-period window except at the largest, nonlinear
+$\varepsilon$, and they scatter above the line. Free-fall orbits with $\lambda_p\gtrsim25$ lose their form
+within one period over the whole range of $\varepsilon$, and since forms break only at close encounters,
+$\tau(\varepsilon)$ is a staircase with one or two steps. Linearly stable orbits (11 classics, 93 of the
+sampled Li--Liao orbits) have $\lambda_p\approx0$, and the linear law does not apply to them. The figure-eight
+and Broucke~A1 keep their form for all 40 periods even at $\varepsilon=10^{-3}$, and other stable orbits break
+only at the largest perturbations, a finite island of stability rather than a linear instability.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+ & unstable orbits & median $\lambda_{\text{fit}}/\lambda_p$ & within $\pm20\%$\\
+\midrule
+Classic & 8 & 0.996 & 8\\
+Li--Liao & 155 & 0.995 & 133\\
+Free fall ($r_{\min}\ge10^{-7}$) & 353 & 0.977 & 331\\
+\bottomrule
+\end{tabular}
+\caption{Measured lifetime exponent against the monodromy exponent.}
+\label{tab:lifetimes}
+\end{table}
+
+\paragraph{Published initial conditions have lifetimes too.} The unperturbed published initial condition is run
+as well. Its form also dies, because the published digits do not lie exactly on the periodic orbit. Inverting the
+fitted law at that lifetime gives its effective distance from the true orbit: a median of $10^{-5.8}$ for the
+classics and $10^{-9.5}$ for the Li--Liao orbits, matching the six and ten digits to which they are published.
+Measured as a form lifetime, a catalogue entry has finite precision. At the precision of its published digits,
+Butterfly~I keeps its form for 23 periods.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.53\linewidth]{docs/lab-lifetimes.jpg}\hfill
+  \includegraphics[width=0.45\linewidth]{docs/lifetime-butterfly.jpg}
+  \caption{Lifetimes of forms. Left: measured exponent $\lambda_{\text{fit}}$ against the monodromy exponent
+  $\lambda_p$ (both $\log_{10}$), for classic (blue), Li--Liao (orange) and free-fall orbits (green; rings: within
+  $10^{-7}$ of a collision, $\lambda_p$ uncertain); dashed: $y=x$. Right: Butterfly~I, mean lifetime against
+  $\varepsilon$ with the range over eight directions, the fit (solid), the predicted slope $1/\lambda_p$ (dashed),
+  and the lifetime of the published initial condition (dotted); hollow points are censored at 40 periods.}
+  \label{fig:lifetimes}
+\end{figure}
+
 \subsection{Which forms occur, and how often}
 
 The number of braid words of length $n$ grows exponentially at the growth rate of $B_3$, whereas the number
@@ -776,8 +861,9 @@ Each step uses the integrator already validated in Section~\ref{sec:instrument}.
       symbols, and estimate $q(w\mid v)$, $\mu([v])$ and the entropy rate $h(v_n)/n$.
 \item \textbf{Markov test.} Cluster the continuation laws $\mathcal R_v\mu$ by KL divergence; finitely many
       clusters would indicate an effective Markov structure.
-\item \textbf{Lifetimes.} Measure the meet depth $|\omega\wedge p|$ for ensembles near periodic orbits and test
-      \eqref{eq:lifetime}: lifetime against $\ln(1/\varepsilon)$ should be linear with slope $1/\lambda_p$.
+\item \textbf{Lifetimes} (\emph{done} for perturbed periodic orbits, Section~\ref{sec:lifetimes}). Open: the meet
+      depth $|\omega\wedge p|$ for generic trajectories that pass near periodic orbits. Measure it for ensembles of such
+      trajectories and compare it with \eqref{eq:lifetime}.
 \item \textbf{Objects at scale.} Evolve clouds of $10^2$--$10^3$ nearby i.c.s, cluster them by
       $\varepsilon$-closeness over time, and measure $N(\varepsilon,t)$, the object dendrogram,
       $\lambda(\delta)$ and $h(\varepsilon)$, both near three-body periodic orbits and in the Chirikov standard
@@ -800,7 +886,8 @@ Poincar\'e's criterion of compensable change, relaxed to finite resolution, make
 object scale-dependent, and chaos couples scale to time: what is one thing now becomes many later. The
 first of these statements, about braids, are now measurements. A census of 14{,}473 orbits, validated against the
 published topology, shows the figure-eight to be the golden braid cubed. It finds a linear law between
-topological entropy and period. It shows that the complexity of a form is independent of its instability.
+topological entropy and period. It shows that the complexity of a form is independent of its instability. A second census shows forms dying at
+the rate the monodromy predicts, $\tau\approx\ln(\delta/\varepsilon)/\lambda_p$.
 The remaining proposals of Section~\ref{sec:programme} are designed to do the same for the genealogical and
 scale-dependent claims.
 

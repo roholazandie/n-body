@@ -921,6 +921,7 @@
     drawDomain();
     if (!o) setTimeout(() => focus && focus.item === item && fillInspector(), 120);
     fillBraid(item, o);
+    fillLife(item, o);
   }
 
   function fillICTable(s, m) {
@@ -1113,6 +1114,147 @@
     };
     if (braidCache.has(key)) run();
     else { note.textContent = 'Computing braid…'; dl.innerHTML = ''; setTimeout(run, 30); }
+  }
+
+  // ---------- form lifetime of the focused orbit ----------
+  const lifeCache = new Map();
+  const LIFE_COLORS = ['#3987e5', '#d95926', '#199e70']; // collection colours, as in the lab
+  let lifeJob = 0;
+  function orbitPeriod(item, o) {
+    return item.kind === 'classic' ? (o && o.T) || CLASSICS[item.idx].T : item.kind === 'll' ? llData()[item.idx].T : ffData().T[item.idx];
+  }
+  // census row -> the shape Lifetime.experiment returns
+  function lifeFromCensus(c, M) {
+    return {
+      source: 'census', lambdaP: c.lambdaP, lambdaRef: c.lambdaCat, maxPeriods: M.maxPeriods, nSyz: c.nSyz,
+      rmin: 10 ** c.rmin, base: { tau: c.base, censored: c.baseCensored }, epsCat: 10 ** c.epsCat, closure0: 10 ** c.closure0, closure: 10 ** c.closure,
+      points: c.taus.map((tau, k) => ({ eps: 10 ** M.eps[k], tau, censored: tau >= M.maxPeriods })),
+      fit: Number.isFinite(c.lambdaFit) ? { lambda: c.lambdaFit, slope: 1 / c.lambdaFit, eps0: 10 ** c.eps0, delta: 10 ** c.delta, r2: c.r2 } : null,
+    };
+  }
+  function fillLife(item, o) {
+    const ref = orbitRef(item);
+    $('lifeSec').hidden = !ref;
+    if (!ref) return;
+    let res = lifeCache.get(item.key);
+    if (!res && window.LIFETIME_META) {
+      const c = window.BraidLab.lifeLookup(ref.col, ref.idx);
+      if (c) res = lifeFromCensus(c, window.LIFETIME_META);
+    }
+    $('lifeRun').disabled = false;
+    $('lifeRun').textContent = res ? 'Re-run live' : 'Run experiment';
+    $('lifeMsg').textContent = res ? (res.source === 'census' ? 'From the lifetime census (scripts/lifetime-census.js).' : 'Computed live in this browser.')
+      : 'Not in the census sample. Running it takes from a few seconds to about a minute: 21 values of ε × 8 directions.';
+    renderLife(ref.col, res);
+    $('lifeRun').onclick = () => runLife(item, o, ref.col);
+  }
+  async function runLife(item, o, col) {
+    const job = ++lifeJob;
+    const { s, m } = itemState(item);
+    const btn = $('lifeRun'), msg = $('lifeMsg');
+    btn.disabled = true;
+    let last = performance.now();
+    const tick = async (f, phase) => {
+      if (job !== lifeJob || !focus || focus.item !== item) throw new Error('cancelled');
+      if (performance.now() - last > 40) {
+        msg.textContent = `${phase === 'monodromy' ? 'Monodromy matrix' : 'Perturbed runs'} … ${Math.round(100 * f)}%`;
+        await new Promise((r) => setTimeout(r, 0));
+        last = performance.now();
+      }
+    };
+    try {
+      const r = await Lifetime.experiment(s, m, orbitPeriod(item, o), item.kind === 'ff' ? 'freefall' : 'closed',
+        { tick, lambdaRef: item.kind === 'ff' ? ffData().lyap[item.idx] : undefined });
+      r.source = 'live';
+      lifeCache.set(item.key, r);
+      if (focus && focus.item === item) fillLife(item, o);
+    } catch (e) {
+      if (e.message !== 'cancelled') { msg.textContent = 'Experiment failed: ' + e.message; btn.disabled = false; }
+    }
+  }
+  function renderLife(col, res) {
+    const dl = $('lifeDl'), cv = $('lifePlot');
+    const W = cv.clientWidth || 280, H = cv.clientHeight || 210;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const color = LIFE_COLORS[col];
+    $('lifeLegend').innerHTML = `<span><i class="dot" style="background:${color}"></i>mean τ (range over directions)</span>` +
+      `<span><i class="ln" style="border-color:${color}"></i>fit</span><span><i class="ln dash" style="border-color:rgba(233,228,239,.7)"></i>slope 1/λ_p</span>`;
+    if (!res) { dl.innerHTML = ''; return; }
+    if (!res.nSyz) {
+      dl.innerHTML = `<dt>Form</dt><dd>none: the bodies are never collinear, so the syzygy sequence is empty</dd>` +
+        (Number.isFinite(res.lambdaP) ? `<dt>λ_p (monodromy)</dt><dd>${res.lambdaP.toFixed(3)} <span class="muted">per period</span></dd>` : '');
+      return;
+    }
+    const P = res.points.map((p) => ({ ...p, x: -Math.log10(p.eps) }));
+    const ymax = Math.max(1e-3, ...P.map((p) => (p.max !== undefined ? p.max : p.tau)), res.base && !res.base.censored ? res.base.tau : 0) * 1.08;
+    const m = { l: 36, r: 8, t: 10, b: 30 };
+    const X0 = 2.5, X1 = 13.5;
+    const sx = (x) => m.l + (x - X0) / (X1 - X0) * (W - m.l - m.r), sy = (y) => H - m.b - y / ymax * (H - m.t - m.b);
+    g.font = '10px ui-sans-serif, system-ui'; g.lineWidth = 1;
+    for (let x = 3; x <= 13; x += 2) {
+      g.strokeStyle = 'rgba(255,255,255,.06)'; g.beginPath(); g.moveTo(sx(x), m.t); g.lineTo(sx(x), H - m.b); g.stroke();
+      g.fillStyle = 'rgba(160,150,175,.9)'; g.textAlign = 'center'; g.fillText(`10⁻${x}`.replace(/\d+$/, (d) => d.split('').map((c) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[c]).join('')), sx(x), H - m.b + 13);
+    }
+    const step = [0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10, 20, 50].find((st) => ymax / st <= 5) || 100;
+    for (let y = 0; y <= ymax; y += step) {
+      g.strokeStyle = 'rgba(255,255,255,.06)'; g.beginPath(); g.moveTo(m.l, sy(y)); g.lineTo(W - m.r, sy(y)); g.stroke();
+      g.fillStyle = 'rgba(160,150,175,.9)'; g.textAlign = 'right'; g.fillText(+y.toPrecision(3), m.l - 5, sy(y) + 3);
+    }
+    g.strokeStyle = 'rgba(255,255,255,.22)'; g.beginPath(); g.moveTo(m.l, m.t); g.lineTo(m.l, H - m.b); g.lineTo(W - m.r, H - m.b); g.stroke();
+    g.fillStyle = 'rgba(220,214,230,.9)'; g.textAlign = 'center';
+    g.fillText('perturbation ε', m.l + (W - m.l - m.r) / 2, H - 4);
+    g.save(); g.translate(10, m.t + (H - m.t - m.b) / 2); g.rotate(-Math.PI / 2); g.fillText('lifetime τ (periods)', 0, 0); g.restore();
+    // the catalogue i.c. itself: its lifetime is the ε → 0 limit
+    if (res.base && !res.base.censored) {
+      g.save(); g.setLineDash([2, 3]); g.strokeStyle = 'rgba(233,228,239,.35)';
+      g.beginPath(); g.moveTo(m.l, sy(res.base.tau)); g.lineTo(W - m.r, sy(res.base.tau)); g.stroke(); g.restore();
+      g.fillStyle = 'rgba(233,228,239,.6)'; g.textAlign = 'left'; g.fillText('published i.c.', m.l + 4, sy(res.base.tau) - 4);
+    }
+    const f = res.fit;
+    if (f) {
+      // fit: τ = ln(δ / (ε + ε₀)) / λ_fit
+      g.strokeStyle = color; g.lineWidth = 2; g.beginPath();
+      for (let x = 3; x <= 13.001; x += 0.05) { const y = Math.log(f.delta / (10 ** -x + f.eps0)) / f.lambda; const Y = sy(Math.max(0, y)); x === 3 ? g.moveTo(sx(x), Y) : g.lineTo(sx(x), Y); }
+      g.stroke();
+      // prediction: slope ln10/λ_p per decade, drawn through the fit at the middle of its linear range
+      if (res.lambdaP > 0.05) {
+        const lin = P.filter((p) => !p.censored && p.eps > 10 * f.eps0);
+        if (lin.length >= 2) {
+          const xm = lin.reduce((a, p) => a + p.x, 0) / lin.length, ym = Math.log(f.delta / (10 ** -xm + f.eps0)) / f.lambda;
+          const xa = lin[0].x, xb = lin[lin.length - 1].x, k = Math.LN10 / res.lambdaP;
+          g.save(); g.setLineDash([5, 4]); g.strokeStyle = 'rgba(233,228,239,.7)'; g.lineWidth = 1.3;
+          g.beginPath(); g.moveTo(sx(xa), sy(ym + k * (xa - xm))); g.lineTo(sx(xb), sy(ym + k * (xb - xm))); g.stroke(); g.restore();
+        }
+      }
+    }
+    for (const p of P) {
+      if (p.min !== undefined && p.max > p.min) {
+        g.strokeStyle = color; g.globalAlpha = 0.45; g.lineWidth = 1;
+        g.beginPath(); g.moveTo(sx(p.x), sy(p.min)); g.lineTo(sx(p.x), sy(p.max)); g.stroke(); g.globalAlpha = 1;
+      }
+      g.beginPath(); g.arc(sx(p.x), sy(p.tau), 3.2, 0, 7);
+      if (p.censored) { g.strokeStyle = color; g.lineWidth = 1.3; g.stroke(); } else { g.fillStyle = color; g.fill(); }
+    }
+    const rows = [];
+    const lp = res.lambdaP;
+    rows.push(['λ_p (monodromy)', Number.isFinite(lp) ? `${lp.toFixed(3)} <span class="muted">per period</span>` : '–']);
+    if (res.rmin < Lifetime.RMIN_RELIABLE) rows.push(['', `<span class="muted">uncertain: the orbit passes within ${res.rmin.toExponential(0)} of a binary collision, below the 10⁻⁷ the finite differences resolve</span>`]);
+    if (Number.isFinite(res.lambdaRef)) rows.push(['Published λ', `${res.lambdaRef.toFixed(3)} <span class="muted">(Hristov et al.)</span>`]);
+    if (f) {
+      const ratio = lp > 0.05 ? f.lambda / lp : NaN;
+      rows.push(['λ_fit (lifetimes)', `${f.lambda.toFixed(3)}${Number.isFinite(ratio) ? ` <span class="muted">· ratio ${ratio.toFixed(3)}</span>` : ''}`]);
+      rows.push(['Break scale δ', `${f.delta.toPrecision(2)} <span class="muted">· fit R² ${f.r2.toFixed(3)}</span>`]);
+      if (f.eps0 > 1e-17) rows.push(['Floor ε₀', `≈ 10<sup>${Math.log10(f.eps0).toFixed(1)}</sup> <span class="muted">numerical</span>`]);
+    } else if (res.points[0] && res.points[0].censored) {
+      rows.push(['Lifetime', `<span class="okc">stable</span>: keeps its form for ${res.maxPeriods} periods at every ε`]);
+    }
+    if (Number.isFinite(res.closure0)) rows.push(['Refined orbit', `${res.closure0.toExponential(0)} → ${res.closure.toExponential(0)} <span class="muted">closure</span>`]);
+    if (res.base) {
+      const d = Number.isFinite(res.epsCat) && res.epsCat > 0 ? ` <span class="muted">→ ≈ 10<sup>${Math.log10(res.epsCat).toFixed(1)}</sup> from the orbit</span>` : '';
+      rows.push(['Published i.c.', res.base.censored ? `form kept ≥ ${res.maxPeriods} periods` : `form lost after ${res.base.tau.toFixed(2)} periods${d}`]);
+    }
+    dl.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
   }
 
   window.ThreeBodyApp = {

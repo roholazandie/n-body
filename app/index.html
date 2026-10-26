@@ -182,7 +182,12 @@
 <div id="lab" class="lab" hidden>
   <div class="lab-head">
     <h2>Braid lab</h2>
-    <p class="sub">Braid invariants of every catalogued periodic orbit, computed from our integrations and checked against the published topology. Hover a point for details; click to open the orbit.</p>
+    <div class="seg lab-mode" id="labMode">
+      <button data-m="braid" class="on">Braid entropy</button>
+      <button data-m="life">Form lifetimes</button>
+    </div>
+    <p class="sub lab-braid">Braid invariants of every catalogued periodic orbit, computed from our integrations and checked against the published topology. Hover a point for details; click to open the orbit.</p>
+    <p class="sub lab-life" hidden>How long a periodic orbit keeps its form. Each orbit is nudged by ε = 10⁻³ … 10⁻¹³ and integrated until its syzygy sequence first deviates. Shadowing predicts a lifetime τ ≈ ln(δ/ε)/λ_p periods, so the measured slope gives an exponent λ_fit that should equal the monodromy exponent λ_p. Points on the dashed line confirm the law.</p>
     <div id="labSummary" class="chips"></div>
   </div>
   <div class="lab-controls">
@@ -197,10 +202,13 @@
     <aside class="lab-side">
       <h3>Correlation (visible points)</h3>
       <div id="labStats"></div>
-      <h3>Nielsen–Thurston type</h3>
+      <h3 class="lab-braid">Nielsen–Thurston type</h3>
+      <h3 class="lab-life" hidden>Lifetime law: λ_fit against λ_p</h3>
       <div id="labTypes"></div>
-      <p class="hint"><b>log λ</b> is the braid's dilatation: any motion realising the braid stretches its surroundings at least by λ per period. The braid is read from the world-lines projected on an axis; its conjugacy class (hence λ, type, permutation, exponent sum) does not depend on the axis.</p>
-      <p class="hint"><b>Free fall</b> orbits retrace themselves, so their full-period braid is trivial (ββ⁻¹ = 1); the census uses the half-period braid closed by a straight-line return. Lyapunov exponents are from Hristov et al.</p>
+      <p class="hint lab-life" hidden><b>λ_p</b> = ln max|μ| of the one-period monodromy matrix, from finite-difference Jacobians along the orbit. <b>λ_fit</b> comes from the lifetimes alone: τ = ln(δ/(ε + ε₀))/λ_fit. Closed orbits are first refined by Newton shooting: published initial conditions close only to 10⁻² (classics) … 10⁻⁸, and for strongly sheared orbits that miss alone makes a stable orbit look unstable. Perturbations start from the refined orbit. The <b>published i.c.</b> itself is run as well: inverting the fitted law at its lifetime gives its effective distance from the true orbit.</p>
+      <p class="hint lab-life" hidden><b>Rings</b>: orbits passing within 10⁻⁷ of a binary collision, where the finite-difference monodromy is unreliable (every free-fall orbit off the published exponent by more than 1% is one of them); they are left out of the statistics. Orbits with large λ_p lose their form within about a period over the whole ε range. Forms break only at close encounters, so the lifetime moves in steps and the slope is coarse there. Stable orbits (figure-eight, Broucke, Bumblebee, many Li &amp; Liao orbits) keep their form for all 40 periods.</p>
+      <p class="hint lab-braid"><b>log λ</b> is the braid's dilatation: any motion realising the braid stretches its surroundings at least by λ per period. The braid is read from the world-lines projected on an axis; its conjugacy class (hence λ, type, permutation, exponent sum) does not depend on the axis.</p>
+      <p class="hint lab-braid"><b>Free fall</b> orbits retrace themselves, so their full-period braid is trivial (ββ⁻¹ = 1); the census uses the half-period braid closed by a straight-line return. Lyapunov exponents are from Hristov et al.</p>
     </aside>
   </div>
 </div>
@@ -224,6 +232,16 @@
     <h3>Braid topology</h3>
     <p id="braidNote" class="hint"></p>
     <dl id="braidDl"></dl>
+  </section>
+
+  <section id="lifeSec">
+    <h3>Form lifetime</h3>
+    <p class="hint">How long the orbit keeps its syzygy sequence when nudged by ε. The prediction is a straight line of slope 1/λ_p in ln(1/ε), with λ_p from the monodromy matrix.</p>
+    <canvas id="lifePlot" class="lifeplot" aria-label="Lifetime against perturbation size"></canvas>
+    <div class="legend" id="lifeLegend"></div>
+    <dl id="lifeDl"></dl>
+    <div class="btns"><button id="lifeRun">Run experiment</button></div>
+    <p id="lifeMsg" class="hint"></p>
   </section>
 
   <section id="stabSec">
@@ -270,6 +288,8 @@
 <script src="orbits-data.js"></script>
 <script src="liao-data.js"></script>
 <script src="braid-data.js"></script>
+<script src="lifetime.js"></script>
+<script src="lifetime-data.js"></script>
 <script src="lab.js"></script>
 <script src="main.js"></script>
 </body>
